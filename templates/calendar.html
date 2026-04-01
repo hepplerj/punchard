@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Calendar — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="cal-toolbar">
+  <div class="cal-nav">
+    <a href="/calendar?week={{ prev_week }}" class="btn btn-ghost btn-sm">← Prev</a>
+    {% if week_start != today_week %}
+    <a href="/calendar" class="btn btn-ghost btn-sm">Today</a>
+    {% endif %}
+    <a href="/calendar?week={{ next_week }}" class="btn btn-ghost btn-sm">Next →</a>
+  </div>
+  <h2 class="cal-range">
+    {{ week_start.strftime('%b %-d') }} – {{ week_end.strftime('%b %-d, %Y') }}
+  </h2>
+</div>
+
+<div class="cal-outer">
+
+  {# ── Day headers ── #}
+  <div class="cal-header-row">
+    <div class="cal-gutter"></div>
+    {% for day in days %}
+    <div class="cal-day-head {% if day.is_today %}is-today{% endif %}">
+      <span class="cal-day-name">{{ day.label }}</span>
+      <span class="cal-day-num {% if day.is_today %}is-today{% endif %}">{{ day.num }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# ── Time grid ── #}
+  <div class="cal-scroll">
+    <div class="cal-grid">
+
+      {# Hour labels #}
+      <div class="cal-gutter">
+        {% for h in hours %}
+        <div class="cal-hour-label" style="top:{{ (h - 6) * 60 }}px">
+          {{ '%d:%02d'|format(h, 0) }}
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Day columns #}
+      {% for day in days %}
+      <div class="cal-day-col {% if day.is_today %}is-today{% endif %}">
+
+        {# Hour lines #}
+        {% for h in hours %}
+        <div class="cal-hour-line" style="top:{{ (h - 6) * 60 }}px"></div>
+        {% endfor %}
+
+        {# Current time indicator #}
+        {% if day.is_today %}
+        <div class="cal-now-line" id="now-line"></div>
+        {% endif %}
+
+        {# Entry blocks #}
+        {% for entry in day.entries %}
+        <div class="cal-block"
+             style="top:{{ entry.top_px }}px; height:{{ entry.height_px }}px; background:{{ entry.color }}; border-left-color:{{ entry.color }}">
+          <span class="cal-block-title">{{ entry.project_name }}</span>
+          {% if entry.height_px > 36 %}
+          <span class="cal-block-time">
+            {{ entry.start_label }}{% if entry.end_label %} – {{ entry.end_label }}{% endif %}
+          </span>
+          {% endif %}
+          {% if entry.note and entry.height_px > 54 %}
+          <span class="cal-block-note">{{ entry.note }}</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Position the "now" line for today's column
+  function positionNowLine() {
+    const line = document.getElementById('now-line');
+    if (!line) return;
+    const now = new Date();
+    const minSinceStart = (now.getHours() * 60 + now.getMinutes()) - {{ display_start }};
+    if (minSinceStart >= 0 && minSinceStart <= 960) {
+      line.style.top = minSinceStart + 'px';
+      line.style.display = 'block';
+    }
+  }
+  positionNowLine();
+  setInterval(positionNowLine, 60000);
+</script>
+
+{% endblock %}
