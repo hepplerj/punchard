@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Punchcard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav>
+    <a class="nav-brand" href="/">[ ] Punchcard</a>
+    <div class="nav-links">
+      <a href="/" {% if request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a>
+      <a href="/projects" {% if request.endpoint == 'projects' %}class="active"{% endif %}>Projects</a>
+      <a href="/entries" {% if request.endpoint == 'entries' %}class="active"{% endif %}>Entries</a>
+      <a href="/calendar" {% if request.endpoint == 'calendar' %}class="active"{% endif %}>Calendar</a>
+      <a href="/report" {% if request.endpoint == 'report' %}class="active"{% endif %}>Report</a>
+    </div>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Punchcard{% endblock %}
+
+{% block content %}
+
+{# ── Active timer ── #}
+{% if active_entry %}
+<div class="card timer-card" x-data="{
+  elapsed: '0:00:00',
+  init() {
+    const start = new Date({{ started_ts }} * 1000);
+    const fmt = n => String(n).padStart(2, '0');
+    setInterval(() => {
+      const diff = Math.floor((new Date() - start) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      this.elapsed = h + ':' + fmt(m) + ':' + fmt(s);
+    }, 1000);
+  }
+}">
+  <div class="timer-running">
+    <span class="project-dot" style="background:{{ active_entry.project_color }}"></span>
+    <span class="timer-project">{{ active_entry.project_name }}</span>
+    {% if active_entry.is_meeting %}<span class="meeting-badge">meeting</span>{% endif %}
+  </div>
+  <div class="timer-elapsed" x-text="elapsed">0:00:00</div>
+  {% if active_entry.note %}
+  <div class="timer-note">{{ active_entry.note }}</div>
+  {% endif %}
+  <form action="/stop" method="post" style="margin-top:1.25rem">
+    <button type="submit" class="btn btn-danger">Stop Timer</button>
+  </form>
+</div>
+
+{% else %}
+
+{# ── Start timer ── #}
+<div class="card">
+  {% if projects %}
+  <form action="/start" method="post" class="start-form">
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label for="project_id">Project</label>
+        <select name="project_id" id="project_id" required>
+          {% for p in projects %}
+          <option value="{{ p.id }}">{{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="flex:2">
+        <label for="note">Note <span class="muted">(optional)</span></label>
+        <input type="text" name="note" id="note" placeholder="What are you working on?">
+      </div>
+      <div class="form-group form-group-check">
+        <label class="check-label">
+          <input type="checkbox" name="is_meeting" value="1">
+          <span>Meeting</span>
+        </label>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Start Timer</button>
+  </form>
+  {% else %}
+  <p class="muted">No projects yet. <a href="/projects">Add one to get started.</a></p>
+  {% endif %}
+</div>
+
+{% endif %}
+
+{# ── Today's entries ── #}
+<div class="section-header">
+  <h2>Today</h2>
+  <div style="display:flex;align-items:center;gap:.75rem;margin-left:auto">
+    {% if today_total > 0 %}
+    <span class="badge">{{ "%.1f"|format(today_total) }}h total</span>
+    {% endif %}
+    {% if projects %}
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('add-entry-form').toggleAttribute('hidden')">+ Add Entry</button>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Manual entry form ── #}
+{% if projects %}
+<div class="card" id="add-entry-form" hidden>
+  <form action="/entries/new" method="post">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Project</label>
+        <select name="project_id" required>
+          {% for p in projects %}
+          <option value="{{ p.id }}">{{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" name="date" value="{{ today }}" required>
+      </div>
+      <div class="form-group">
+        <label>Start</label>
+        <input type="time" name="start_time" required>
+      </div>
+      <div class="form-group">
+        <label>End <span class="muted">(optional)</span></label>
+        <input type="time" name="stop_time">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Note <span class="muted">(optional)</span></label>
+        <input type="text" name="note" placeholder="What did you work on?">
+      </div>
+      <div class="form-group form-group-check">
+        <label class="check-label">
+          <input type="checkbox" name="is_meeting" value="1">
+          <span>Meeting</span>
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button type="submit" class="btn btn-primary">Add Entry</button>
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('add-entry-form').setAttribute('hidden','')">Cancel</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if today_entries %}
+<div class="entry-list">
+  {% for e in today_entries %}
+  <div x-data="{ editing: false }">
+
+    {# ── View row ── #}
+    <div class="entry-row" x-show="!editing">
+      <span class="project-dot" style="background:{{ e.project_color }}"></span>
+      <span class="entry-project">{{ e.project_name }}</span>
+      {% if e.is_meeting %}<span class="meeting-badge">meeting</span>{% endif %}
+      <span class="entry-time muted">
+        {{ e.started_at[11:16] }}
+        {% if e.stopped_at %}– {{ e.stopped_at[11:16] }}{% else %}<em>running</em>{% endif %}
+      </span>
+      {% if e.note %}
+      <span class="entry-note muted">{{ e.note }}</span>
+      {% endif %}
+      <span class="entry-hours">{{ "%.2f"|format(e.hours) }}h</span>
+      <button class="btn btn-ghost btn-sm" @click="editing = true" title="Edit">✎</button>
+      <form action="/entries/{{ e.id }}/delete" method="post" class="inline-form">
+        <button type="submit" class="btn btn-ghost btn-sm btn-delete" title="Delete">✕</button>
+      </form>
+    </div>
+
+    {# ── Edit row ── #}
+    <div class="entry-edit-row" x-show="editing" x-cloak>
+      <form action="/entries/{{ e.id }}/edit" method="post">
+        <div class="form-row" style="margin-bottom:.75rem">
+          <div class="form-group" style="flex:2">
+            <label>Project</label>
+            <select name="project_id" required>
+              {% for p in projects %}
+              <option value="{{ p.id }}" {% if p.id == e.project_id %}selected{% endif %}>
+                {{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" value="{{ e.started_at[:10] }}" required>
+          </div>
+          <div class="form-group">
+            <label>Start</label>
+            <input type="time" name="start_time" value="{{ e.started_at[11:16] }}" required>
+          </div>
+          <div class="form-group">
+            <label>End</label>
+            <input type="time" name="stop_time" value="{{ e.stopped_at[11:16] if e.stopped_at else '' }}">
+          </div>
+          <div class="form-group" style="flex:2">
+            <label>Note</label>
+            <input type="text" name="note" value="{{ e.note }}">
+          </div>
+          <div class="form-group form-group-check">
+            <label class="check-label">
+              <input type="checkbox" name="is_meeting" value="1" {% if e.is_meeting %}checked{% endif %}>
+              <span>Meeting</span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;padding:.5rem 1rem 1rem">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="editing = false">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted empty-state">No entries today.</p>
+{% endif %}
+
+{% endblock %}
