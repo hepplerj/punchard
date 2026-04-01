@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Report — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header">
+  <h2>Time Report</h2>
+</div>
+
+{# ── Date range ── #}
+<div class="card" x-data="presets()">
+  <form action="/report" method="get" class="report-form">
+    <div class="form-row" style="align-items:flex-end">
+      <div class="form-group">
+        <label for="start">From</label>
+        <input type="date" name="start" id="start" x-model="start" value="{{ start }}">
+      </div>
+      <div class="form-group">
+        <label for="end">To</label>
+        <input type="date" name="end" id="end" x-model="end" value="{{ end }}">
+      </div>
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary">Generate</button>
+      </div>
+    </div>
+    <div class="preset-btns">
+      <button type="button" class="btn btn-ghost btn-sm" @click="setThisQuarter">This Quarter</button>
+      <button type="button" class="btn btn-ghost btn-sm" @click="setLastQuarter">Last Quarter</button>
+      <button type="button" class="btn btn-ghost btn-sm" @click="setThisYear">This Year</button>
+      <button type="button" class="btn btn-ghost btn-sm" @click="setLastYear">Last Year</button>
+      <button type="button" class="btn btn-ghost btn-sm" @click="setThisMonth">This Month</button>
+      <button type="button" class="btn btn-ghost btn-sm" @click="setLast30">Last 30 Days</button>
+    </div>
+  </form>
+</div>
+
+{% if rows %}
+
+<div class="report-stack">
+
+  {# ── Summary table ── #}
+  <div class="card">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>PI</th>
+          <th class="num">Total</th>
+          <th class="num">Work</th>
+          <th class="num">Meetings</th>
+          <th class="num">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <span class="project-dot" style="background:{{ r.color }}"></span>
+            {{ r.name }}
+          </td>
+          <td class="muted">{{ r.pi_name or '—' }}</td>
+          <td class="num">{{ "%.2f"|format(r.hours) }}</td>
+          <td class="num">{{ "%.2f"|format(r.hours - r.meeting_hours) }}</td>
+          <td class="num">
+            {% if r.meeting_hours > 0 %}
+            <span class="meeting-badge">{{ "%.2f"|format(r.meeting_hours) }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="num muted">
+            {% if total > 0 %}{{ "%.0f"|format(r.hours / total * 100) }}%{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2"><strong>Total</strong></td>
+          <td class="num"><strong>{{ "%.2f"|format(total) }}</strong></td>
+          <td class="num"><strong>{{ "%.2f"|format(total - total_meeting) }}</strong></td>
+          <td class="num">
+            {% if total_meeting > 0 %}
+            <span class="meeting-badge">{{ "%.2f"|format(total_meeting) }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="num muted">100%</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  {# ── Hours by project ── #}
+  <div class="card chart-card">
+    <div class="chart-label">Hours by Project</div>
+    <div id="chart-hours"></div>
+  </div>
+
+  {# ── Work vs meetings ── #}
+  <div class="card chart-card">
+    <div class="chart-label">Work vs Meetings</div>
+    <div id="chart-meetings"></div>
+  </div>
+
+</div>
+
+<script type="module">
+import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm";
+
+const data = {{ chart_data|safe }};
+const mono = "'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace";
+const plotStyle = { fontFamily: mono, fontSize: "12px", color: "#2C2416", background: "transparent" };
+
+// ── Hours by project ──
+const rows = data.labels.map((name, i) => ({
+  name,
+  hours: data.data[i],
+  color: data.colors[i],
+}));
+
+document.getElementById("chart-hours").appendChild(Plot.plot({
+  marginLeft: 160,
+  marginRight: 50,
+  height: Math.max(rows.length * 40 + 40, 160),
+  x: { label: "Hours", grid: true },
+  y: { label: null, domain: rows.map(d => d.name) },
+  style: plotStyle,
+  marks: [
+    Plot.barX(rows, {
+      y: "name", x: "hours", fill: "color",
+      sort: { y: "-x" }, rx: 2,
+    }),
+    Plot.text(rows, {
+      y: "name", x: "hours",
+      text: d => d.hours.toFixed(1) + "h",
+      dx: 6, textAnchor: "start",
+      fontFamily: mono, fontSize: 11, fill: "#7A6E5D",
+    }),
+    Plot.ruleX([0]),
+  ],
+}));
+
+// ── Meeting time by project ──
+const mtgRows = rows
+  .map((r, i) => ({ name: r.name, hours: data.meeting[i], color: r.color }))
+  .filter(d => d.hours > 0)
+  .sort((a, b) => b.hours - a.hours);
+
+if (mtgRows.length > 0) {
+  document.getElementById("chart-meetings").appendChild(Plot.plot({
+    marginLeft: 160,
+    marginRight: 50,
+    height: Math.max(mtgRows.length * 40 + 40, 160),
+    x: { label: "Hours", grid: true },
+    y: { label: null, domain: mtgRows.map(d => d.name) },
+    style: plotStyle,
+    marks: [
+      Plot.barX(mtgRows, {
+        y: "name", x: "hours", fill: "#A78BFA",
+        sort: { y: "-x" }, rx: 2,
+      }),
+      Plot.text(mtgRows, {
+        y: "name", x: "hours",
+        text: d => d.hours.toFixed(1) + "h",
+        dx: 6, textAnchor: "start",
+        fontFamily: mono, fontSize: 11, fill: "#7A6E5D",
+      }),
+      Plot.ruleX([0]),
+    ],
+  }));
+} else {
+  document.getElementById("chart-meetings").innerHTML =
+    '<p style="color:#7A6E5D;font-size:.85rem;text-align:center;padding:1rem">No meetings in this period.</p>';
+}
+</script>
+
+{% else %}
+<p class="muted empty-state">No completed entries in this date range.</p>
+{% endif %}
+
+<script>
+function presets() {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  return {
+    start: '{{ start }}',
+    end: '{{ end }}',
+    setThisMonth() {
+      const n = new Date();
+      this.start = fmt(new Date(n.getFullYear(), n.getMonth(), 1));
+      this.end = fmt(n);
+    },
+    setLast30() {
+      const n = new Date();
+      const s = new Date(n); s.setDate(s.getDate() - 30);
+      this.start = fmt(s); this.end = fmt(n);
+    },
+    setThisQuarter() {
+      const n = new Date();
+      const qm = Math.floor(n.getMonth() / 3) * 3;
+      this.start = fmt(new Date(n.getFullYear(), qm, 1));
+      this.end = fmt(n);
+    },
+    setLastQuarter() {
+      const n = new Date();
+      const qm = Math.floor(n.getMonth() / 3) * 3;
+      const lqStart = new Date(n.getFullYear(), qm - 3, 1);
+      const lqEnd = new Date(n.getFullYear(), qm, 0);
+      this.start = fmt(lqStart); this.end = fmt(lqEnd);
+    },
+    setThisYear() {
+      const n = new Date();
+      this.start = `${n.getFullYear()}-01-01`;
+      this.end = fmt(n);
+    },
+    setLastYear() {
+      const y = new Date().getFullYear() - 1;
+      this.start = `${y}-01-01`; this.end = `${y}-12-31`;
+    },
+  }
+}
+</script>
+
+{% endblock %}
