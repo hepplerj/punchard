@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Entries — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header">
+  <h2>Entries</h2>
+</div>
+
+{# ── Filters ── #}
+<div class="card">
+  <form method="get" action="/entries" class="filter-form">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Project</label>
+        <select name="project_id">
+          <option value="">All projects</option>
+          {% for p in projects %}
+          <option value="{{ p.id }}" {% if project_id == p.id|string %}selected{% endif %}>
+            {{ p.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>From</label>
+        <input type="date" name="start" value="{{ start }}">
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="date" name="end" value="{{ end }}">
+      </div>
+      <div class="form-group form-group-check">
+        <label class="check-label">
+          <input type="checkbox" name="meeting_only" value="1" {% if meeting_only %}checked{% endif %}>
+          <span>Meetings only</span>
+        </label>
+      </div>
+      <div class="form-group" style="justify-content:flex-end">
+        <div style="display:flex;gap:.5rem">
+          <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+          <a href="/entries" class="btn btn-ghost btn-sm">Reset</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+{# ── Entry list ── #}
+{% if entries %}
+
+<div class="entries-log">
+
+  {# Group by date #}
+  {% set ns = namespace(current_date='') %}
+  {% for e in entries %}
+    {% set entry_date = e.started_at[:10] %}
+    {% if entry_date != ns.current_date %}
+      {% if ns.current_date != '' %}</div>{% endif %}
+      {% set ns.current_date = entry_date %}
+      <div class="entries-day-group">
+      <div class="entries-day-header">
+        <span>{{ entry_date }}</span>
+      </div>
+    {% endif %}
+
+    <div x-data="{ editing: false }">
+
+      {# ── View row ── #}
+      <div class="entry-row" x-show="!editing">
+        <span class="project-dot" style="background:{{ e.project_color }}"></span>
+        <span class="entry-project">{{ e.project_name }}</span>
+        {% if e.is_meeting %}<span class="meeting-badge">meeting</span>{% endif %}
+        <span class="entry-time muted">
+          {{ e.started_at[11:16] }} – {{ e.stopped_at[11:16] }}
+        </span>
+        {% if e.note %}
+        <span class="entry-note muted">{{ e.note }}</span>
+        {% endif %}
+        <span class="entry-hours">{{ "%.2f"|format(e.hours) }}h</span>
+        <button class="btn btn-ghost btn-sm" @click="editing = true" title="Edit">✎</button>
+        <form action="/entries/{{ e.id }}/delete" method="post" class="inline-form">
+          <input type="hidden" name="back" value="entries">
+          <button type="submit" class="btn btn-ghost btn-sm btn-delete" title="Delete">✕</button>
+        </form>
+      </div>
+
+      {# ── Edit row ── #}
+      <div class="entry-edit-row" x-show="editing" x-cloak>
+        <form action="/entries/{{ e.id }}/edit" method="post">
+          <input type="hidden" name="back" value="entries">
+          <div class="form-row" style="margin-bottom:.75rem">
+            <div class="form-group" style="flex:2">
+              <label>Project</label>
+              <select name="project_id" required>
+                {% for p in projects %}
+                <option value="{{ p.id }}" {% if p.id == e.project_id %}selected{% endif %}>
+                  {{ p.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ e.started_at[:10] }}" required>
+            </div>
+            <div class="form-group">
+              <label>Start</label>
+              <input type="time" name="start_time" value="{{ e.started_at[11:16] }}" required>
+            </div>
+            <div class="form-group">
+              <label>End</label>
+              <input type="time" name="stop_time" value="{{ e.stopped_at[11:16] }}">
+            </div>
+            <div class="form-group" style="flex:2">
+              <label>Note</label>
+              <input type="text" name="note" value="{{ e.note }}">
+            </div>
+            <div class="form-group form-group-check">
+              <label class="check-label">
+                <input type="checkbox" name="is_meeting" value="1" {% if e.is_meeting %}checked{% endif %}>
+                <span>Meeting</span>
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;padding:.5rem 1rem 1rem">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="editing = false">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  {% endfor %}
+  </div>{# close last day group #}
+
+</div>
+
+{% else %}
+<p class="muted empty-state">No entries found.</p>
+{% endif %}
+
+{% endblock %}
