@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import project_select %}
 {% block title %}Entries — Punchcard{% endblock %}
 
 {% block content %}
@@ -13,14 +14,7 @@
     <div class="form-row">
       <div class="form-group" style="flex:2">
         <label>Project</label>
-        <select name="project_id">
-          <option value="">All projects</option>
-          {% for p in projects %}
-          <option value="{{ p.id }}" {% if project_id == p.id|string %}selected{% endif %}>
-            {{ p.name }}
-          </option>
-          {% endfor %}
-        </select>
+        {{ project_select(projects, selected=project_id, required=False, include_all=True) }}
       </div>
       <div class="form-group">
         <label>From</label>
@@ -92,13 +86,7 @@
           <div class="form-row" style="margin-bottom:.75rem">
             <div class="form-group" style="flex:2">
               <label>Project</label>
-              <select name="project_id" required>
-                {% for p in projects %}
-                <option value="{{ p.id }}" {% if p.id == e.project_id %}selected{% endif %}>
-                  {{ p.name }}
-                </option>
-                {% endfor %}
-              </select>
+              {{ project_select(projects, selected=e.project_id) }}
             </div>
             <div class="form-group">
               <label>Date</label>

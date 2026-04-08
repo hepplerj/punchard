@@ -1,0 +1,19 @@
+{# Reusable project dropdown grouped by PI #}
+{% macro project_select(projects, name="project_id", selected=None, required=True, include_all=False) %}
+<select name="{{ name }}" {% if name == "project_id" %}id="{{ name }}"{% endif %} {% if required %}required{% endif %}>
+  {% if include_all %}<option value="">All projects</option>{% endif %}
+  {% set ns = namespace(current_pi=None) %}
+  {% for p in projects %}
+    {% set pi = p.pi_name or "No PI" %}
+    {% if pi != ns.current_pi %}
+      {% if ns.current_pi is not none %}</optgroup>{% endif %}
+      <optgroup label="{{ pi }}">
+      {% set ns.current_pi = pi %}
+    {% endif %}
+    <option value="{{ p.id }}" {% if selected is not none and (p.id == selected or p.id|string == selected) %}selected{% endif %}>
+      {{ p.name }}
+    </option>
+  {% endfor %}
+  {% if ns.current_pi is not none %}</optgroup>{% endif %}
+</select>
+{% endmacro %}

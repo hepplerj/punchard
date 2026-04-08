@@ -671,6 +671,84 @@ input[type="time"]:focus {
   cursor: pointer;
 }
 
+/* ── Allocations ── */
+.alloc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.alloc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.alloc-label {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-right: .5rem;
+}
+
+.alloc-range {
+  font-family: var(--mono);
+  font-size: .8rem;
+}
+
+.alloc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .9rem;
+  margin: 1rem 0;
+}
+
+.alloc-table th, .alloc-table td {
+  text-align: left;
+  padding: .45rem .5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.alloc-table thead th {
+  font-family: var(--mono);
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.alloc-add-form {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--border);
+}
+
+input[type="number"] {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: .5rem .7rem;
+  font-size: .95rem;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  font-family: inherit;
+  width: 100%;
+}
+
+input[type="number"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+.badge-ok { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
+.badge-warn { background: #FEF3C7; color: #D97706; border-color: #FDE68A; }
+
+.delta-over { color: #D97706; font-weight: 600; }
+.delta-under { color: var(--primary); font-weight: 600; }
+
 /* ── Utilities ── */
 .muted { color: var(--muted); }
 .empty-state { padding: 2rem 0; text-align: center; }

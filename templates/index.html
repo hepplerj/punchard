@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import project_select %}
 {% block title %}Dashboard — Punchcard{% endblock %}
 
 {% block content %}
@@ -42,11 +43,7 @@
     <div class="form-row">
       <div class="form-group" style="flex:1">
         <label for="project_id">Project</label>
-        <select name="project_id" id="project_id" required>
-          {% for p in projects %}
-          <option value="{{ p.id }}">{{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}</option>
-          {% endfor %}
-        </select>
+        {{ project_select(projects) }}
       </div>
       <div class="form-group" style="flex:2">
         <label for="note">Note <span class="muted">(optional)</span></label>
@@ -88,11 +85,7 @@
     <div class="form-row">
       <div class="form-group" style="flex:2">
         <label>Project</label>
-        <select name="project_id" required>
-          {% for p in projects %}
-          <option value="{{ p.id }}">{{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}</option>
-          {% endfor %}
-        </select>
+        {{ project_select(projects) }}
       </div>
       <div class="form-group">
         <label>Date</label>
@@ -155,13 +148,7 @@
         <div class="form-row" style="margin-bottom:.75rem">
           <div class="form-group" style="flex:2">
             <label>Project</label>
-            <select name="project_id" required>
-              {% for p in projects %}
-              <option value="{{ p.id }}" {% if p.id == e.project_id %}selected{% endif %}>
-                {{ p.name }}{% if p.pi_name %} ({{ p.pi_name }}){% endif %}
-              </option>
-              {% endfor %}
-            </select>
+            {{ project_select(projects, selected=e.project_id) }}
           </div>
           <div class="form-group">
             <label>Date</label>

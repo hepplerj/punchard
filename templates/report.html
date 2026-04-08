@@ -100,6 +100,49 @@
     <div id="chart-meetings"></div>
   </div>
 
+  {# ── Allocation comparison ── #}
+  {% if alloc_comparison %}
+  <div class="card">
+    <div class="alloc-header" style="margin-bottom:1rem">
+      <div>
+        <span class="chart-label" style="margin-bottom:0">Allocation: {{ alloc_comparison.label }}</span>
+        <span class="alloc-range muted">{{ alloc_comparison.start }} – {{ alloc_comparison.end }}</span>
+      </div>
+      <a href="/allocations" class="btn btn-ghost btn-sm">Edit Allocations</a>
+    </div>
+
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>PI / Category</th>
+          <th class="num">Target</th>
+          <th class="num">Actual Hours</th>
+          <th class="num">Actual %</th>
+          <th class="num">Delta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in alloc_comparison.entries %}
+        <tr>
+          <td>{{ c.pi_name }}</td>
+          <td class="num">{{ "%.0f"|format(c.target_pct) }}%</td>
+          <td class="num">{{ "%.2f"|format(c.actual_hrs) }}</td>
+          <td class="num">{{ "%.1f"|format(c.actual_pct) }}%</td>
+          <td class="num {% if c.delta > 5 %}delta-over{% elif c.delta < -5 %}delta-under{% endif %}">
+            {{ "%+.1f"|format(c.delta) }}%
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card chart-card">
+    <div class="chart-label">Target vs Actual (%)</div>
+    <div id="chart-alloc"></div>
+  </div>
+  {% endif %}
+
 </div>
 
 <script type="module">
@@ -170,6 +213,38 @@ if (mtgRows.length > 0) {
   document.getElementById("chart-meetings").innerHTML =
     '<p style="color:#7A6E5D;font-size:.85rem;text-align:center;padding:1rem">No meetings in this period.</p>';
 }
+
+// ── Allocation comparison ──
+{% if alloc_chart_data %}
+const allocData = {{ alloc_chart_data|safe }};
+const allocRows = [];
+allocData.labels.forEach((name, i) => {
+  allocRows.push({ name, value: allocData.target[i], type: "Target" });
+  allocRows.push({ name, value: allocData.actual[i], type: "Actual" });
+});
+
+document.getElementById("chart-alloc").appendChild(Plot.plot({
+  marginLeft: 160,
+  marginRight: 50,
+  height: Math.max(allocData.labels.length * 50 + 40, 160),
+  x: { label: "%", grid: true },
+  y: { label: null, domain: allocData.labels },
+  color: {
+    domain: ["Target", "Actual"],
+    range: ["#D9D2C5", "#2563EB"],
+    legend: true,
+  },
+  style: plotStyle,
+  marks: [
+    Plot.barX(allocRows, {
+      y: "name", x: "value", fill: "type",
+      fx: null,
+      rx: 2,
+    }),
+    Plot.ruleX([0]),
+  ],
+}));
+{% endif %}
 </script>
 
 {% else %}

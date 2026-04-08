@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Allocations — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header">
+  <h2>Time Allocations</h2>
+</div>
+
+{# ── New period ── #}
+<div class="card" x-data="{ open: false }">
+  <button class="btn btn-primary" @click="open = !open" x-text="open ? 'Cancel' : '+ New Period'"></button>
+
+  <form action="/allocations/new" method="post" x-show="open" x-cloak style="margin-top:1.25rem">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Label</label>
+        <input type="text" name="label" required placeholder="e.g. Spring 2026">
+      </div>
+      <div class="form-group">
+        <label>Start Date</label>
+        <input type="date" name="start_date" required>
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="date" name="end_date" required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Create Period</button>
+  </form>
+</div>
+
+{# ── Period list ── #}
+{% if allocations %}
+<div class="alloc-list">
+  {% for item in allocations %}
+  {% set a = item.alloc %}
+  <div class="card">
+    <div class="alloc-header">
+      <div>
+        <span class="alloc-label">{{ a.label }}</span>
+        <span class="alloc-range muted">{{ a.start_date }} – {{ a.end_date }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <span class="badge {% if item.total_pct == 100 %}badge-ok{% elif item.total_pct > 100 %}badge-warn{% endif %}">
+          {{ "%.0f"|format(item.total_pct) }}% allocated
+        </span>
+        <form action="/allocations/{{ a.id }}/delete" method="post" class="inline-form"
+              onsubmit="return confirm('Delete this allocation period?')">
+          <button type="submit" class="btn btn-ghost btn-sm btn-delete">Delete</button>
+        </form>
+      </div>
+    </div>
+
+    {# ── PI entries ── #}
+    {% if item.entries %}
+    <table class="alloc-table">
+      <thead>
+        <tr>
+          <th>PI / Category</th>
+          <th class="num">%</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in item.entries %}
+        <tr>
+          <td>{{ e.pi_name }}{% if e.pi_name == 'Professional Development' %} <span class="muted">(fixed)</span>{% endif %}</td>
+          <td class="num">{{ "%.0f"|format(e.percentage) }}%</td>
+          <td class="num">
+            {% if e.pi_name != 'Professional Development' %}
+            <form action="/allocations/entries/{{ e.id }}/delete" method="post" class="inline-form">
+              <button type="submit" class="btn btn-ghost btn-sm btn-delete" title="Remove">✕</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {# ── Add PI ── #}
+    {% set remaining = 100 - item.total_pct %}
+    {% if remaining > 0 %}
+    <form action="/allocations/{{ a.id }}/entries/new" method="post" class="alloc-add-form">
+      <div class="form-row" style="margin-bottom:0;align-items:flex-end">
+        <div class="form-group" style="flex:2">
+          <label>PI <span class="muted">({{ "%.0f"|format(remaining) }}% remaining)</span></label>
+          <select name="pi_name" required>
+            <option value="" disabled selected>Select PI</option>
+            {% for pi in pi_names %}
+            <option value="{{ pi }}">{{ pi }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Percentage</label>
+          <input type="number" name="percentage" required min="1" max="{{ remaining|int }}" step="1" placeholder="{{ remaining|int }}">
+        </div>
+        <div class="form-group" style="flex:0">
+          <button type="submit" class="btn btn-ghost btn-sm">Add</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted empty-state">No allocation periods yet. Create one above.</p>
+{% endif %}
+
+{% endblock %}

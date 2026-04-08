@@ -50,6 +50,19 @@ def init_db():
                 note        TEXT NOT NULL DEFAULT '',
                 is_meeting  INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS allocations (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                label      TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date   TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
+            );
+            CREATE TABLE IF NOT EXISTS allocation_entries (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                allocation_id INTEGER NOT NULL REFERENCES allocations(id),
+                pi_name       TEXT NOT NULL,
+                percentage    REAL NOT NULL
+            );
         """)
         # Migration: add is_meeting to existing databases
         cols = [r[1] for r in db.execute("PRAGMA table_info(entries)").fetchall()]
@@ -77,7 +90,7 @@ def to_unix(dt_str):
 def index():
     db = get_db()
     projects = db.execute(
-        "SELECT * FROM projects WHERE active = 1 ORDER BY name"
+        "SELECT * FROM projects WHERE active = 1 ORDER BY pi_name, name"
     ).fetchall()
 
     active_entry = db.execute("""
@@ -182,7 +195,7 @@ def delete_entry(entry_id):
 @app.route("/entries")
 def entries():
     db = get_db()
-    projects = db.execute("SELECT * FROM projects ORDER BY name").fetchall()
+    projects = db.execute("SELECT * FROM projects ORDER BY pi_name, name").fetchall()
 
     # Filters
     project_id = request.args.get("project_id", "")
@@ -330,6 +343,73 @@ def report():
         "colors": [r["color"] for r in rows],
     })
 
+    # Find allocation period that best overlaps this date range
+    allocation = db.execute("""
+        SELECT * FROM allocations
+        WHERE start_date <= ? AND end_date >= ?
+        ORDER BY start_date DESC LIMIT 1
+    """, (end, start)).fetchone()
+
+    alloc_comparison = None
+    alloc_chart_data = None
+    if allocation:
+        alloc_entries = db.execute("""
+            SELECT pi_name, percentage FROM allocation_entries
+            WHERE allocation_id = ? ORDER BY percentage DESC
+        """, (allocation["id"],)).fetchall()
+
+        if alloc_entries:
+            # Aggregate actual hours by PI
+            pi_hours = db.execute("""
+                SELECT p.pi_name,
+                       ROUND(SUM(
+                         (julianday(e.stopped_at) - julianday(e.started_at)) * 24
+                       ), 2) AS hours
+                FROM entries e JOIN projects p ON e.project_id = p.id
+                WHERE e.stopped_at IS NOT NULL
+                  AND date(e.started_at) BETWEEN ? AND ?
+                GROUP BY p.pi_name
+            """, (start, end)).fetchall()
+
+            pi_hours_map = {r["pi_name"]: float(r["hours"] or 0) for r in pi_hours}
+
+            comparison = []
+            for ae in alloc_entries:
+                actual = pi_hours_map.pop(ae["pi_name"], 0.0)
+                actual_pct = (actual / total * 100) if total > 0 else 0
+                comparison.append({
+                    "pi_name":    ae["pi_name"],
+                    "target_pct": ae["percentage"],
+                    "actual_hrs": actual,
+                    "actual_pct": round(actual_pct, 1),
+                    "delta":      round(actual_pct - ae["percentage"], 1),
+                })
+
+            # Any PIs with hours but no allocation
+            for pi, hrs in pi_hours_map.items():
+                if hrs > 0:
+                    actual_pct = (hrs / total * 100) if total > 0 else 0
+                    comparison.append({
+                        "pi_name":    pi or "(unassigned)",
+                        "target_pct": 0,
+                        "actual_hrs": hrs,
+                        "actual_pct": round(actual_pct, 1),
+                        "delta":      round(actual_pct, 1),
+                    })
+
+            alloc_comparison = {
+                "label":   allocation["label"],
+                "start":   allocation["start_date"],
+                "end":     allocation["end_date"],
+                "entries": comparison,
+            }
+
+            alloc_chart_data = json.dumps({
+                "labels":  [c["pi_name"] or "(unassigned)" for c in comparison],
+                "target":  [c["target_pct"] for c in comparison],
+                "actual":  [c["actual_pct"] for c in comparison],
+            })
+
     return render_template(
         "report.html",
         rows=rows,
@@ -338,7 +418,78 @@ def report():
         total=total,
         total_meeting=total_meeting,
         chart_data=chart_data,
+        alloc_comparison=alloc_comparison,
+        alloc_chart_data=alloc_chart_data,
     )
+
+
+# ---------------------------------------------------------------------------
+# Routes — allocations
+# ---------------------------------------------------------------------------
+
+@app.route("/allocations")
+def allocations():
+    db = get_db()
+    allocs = db.execute("SELECT * FROM allocations ORDER BY start_date DESC").fetchall()
+    result = []
+    for a in allocs:
+        entries = db.execute("""
+            SELECT * FROM allocation_entries
+            WHERE allocation_id = ? ORDER BY percentage DESC
+        """, (a["id"],)).fetchall()
+        total_pct = sum(e["percentage"] for e in entries)
+        result.append({"alloc": a, "entries": entries, "total_pct": total_pct})
+
+    pi_names = [r[0] for r in db.execute(
+        "SELECT DISTINCT pi_name FROM projects WHERE pi_name != '' ORDER BY pi_name"
+    ).fetchall()]
+
+    return render_template("allocations.html", allocations=result, pi_names=pi_names)
+
+
+@app.route("/allocations/new", methods=["POST"])
+def new_allocation():
+    db = get_db()
+    db.execute(
+        "INSERT INTO allocations (label, start_date, end_date) VALUES (?, ?, ?)",
+        (request.form["label"].strip(), request.form["start_date"], request.form["end_date"]),
+    )
+    alloc_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    # Always reserve 20% for professional development
+    db.execute(
+        "INSERT INTO allocation_entries (allocation_id, pi_name, percentage) VALUES (?, ?, ?)",
+        (alloc_id, "Professional Development", 20),
+    )
+    db.commit()
+    return redirect(url_for("allocations"))
+
+
+@app.route("/allocations/<int:alloc_id>/delete", methods=["POST"])
+def delete_allocation(alloc_id):
+    db = get_db()
+    db.execute("DELETE FROM allocation_entries WHERE allocation_id = ?", (alloc_id,))
+    db.execute("DELETE FROM allocations WHERE id = ?", (alloc_id,))
+    db.commit()
+    return redirect(url_for("allocations"))
+
+
+@app.route("/allocations/<int:alloc_id>/entries/new", methods=["POST"])
+def new_allocation_entry(alloc_id):
+    db = get_db()
+    db.execute(
+        "INSERT INTO allocation_entries (allocation_id, pi_name, percentage) VALUES (?, ?, ?)",
+        (alloc_id, request.form["pi_name"].strip(), float(request.form["percentage"])),
+    )
+    db.commit()
+    return redirect(url_for("allocations"))
+
+
+@app.route("/allocations/entries/<int:entry_id>/delete", methods=["POST"])
+def delete_allocation_entry(entry_id):
+    db = get_db()
+    db.execute("DELETE FROM allocation_entries WHERE id = ?", (entry_id,))
+    db.commit()
+    return redirect(url_for("allocations"))
 
 
 # ---------------------------------------------------------------------------
