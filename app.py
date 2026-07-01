@@ -277,7 +277,8 @@ def tasks():
     ).fetchall()
 
     project_id = request.args.get("project_id", "")
-    hide_done = request.args.get("hide_done", "1")
+    hd = request.args.getlist("hide_done")
+    hide_done = hd[-1] if hd else "1"
 
     where = []
     params = []
