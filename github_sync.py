@@ -81,7 +81,7 @@ def reconcile(db, items):
     closed = 0
     open_gh = db.execute(
         "SELECT id, gh_repo, gh_number FROM tasks "
-        "WHERE source='github' AND status='open'"
+        "WHERE source='github' AND status='open' AND assigned_to_me=1"
     ).fetchall()
     for row in open_gh:
         if (row["gh_repo"], row["gh_number"]) not in seen:

@@ -27,7 +27,7 @@
     </div>
     <div class="form-group" style="flex:2">
       <label>Project</label>
-      {{ project_select(projects, required=False, include_all=True) }}
+      {{ project_select(projects, required=False, include_all=True, blank_label="— none —") }}
     </div>
     <div class="form-group" style="justify-content:flex-end">
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
@@ -88,7 +88,7 @@
 
       {# assign / reassign project #}
       <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form">
-        {{ project_select(projects, selected=t.project_id, required=False, include_all=True) }}
+        {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
         <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
       </form>
 

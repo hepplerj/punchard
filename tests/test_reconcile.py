@@ -61,3 +61,13 @@ def test_adhoc_untouched_by_sync(raw_db):
     raw_db.commit()
     github_sync.reconcile(raw_db, [])  # empty github results
     assert raw_db.execute("SELECT status FROM tasks WHERE source='adhoc'").fetchone()["status"] == "open"
+
+
+def test_browse_added_task_survives_sync(raw_db):
+    # A browse-added task: github source, assigned_to_me=0, not returned by fetch_mine.
+    raw_db.execute("INSERT INTO tasks (source, title, status, gh_repo, gh_number, gh_url, gh_type, assigned_to_me) "
+                   "VALUES ('github', 'Stray', 'open', 'chnm/bar', 3, 'u', 'issue', 0)")
+    raw_db.commit()
+    github_sync.reconcile(raw_db, [])  # my sync returns nothing
+    row = raw_db.execute("SELECT status FROM tasks WHERE gh_number=3").fetchone()
+    assert row["status"] == "open"

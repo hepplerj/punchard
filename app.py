@@ -331,6 +331,8 @@ def tasks_sync():
         return redirect(url_for("tasks", synced=msg))
     except github_sync.GitHubError as e:
         return redirect(url_for("tasks", error=str(e)))
+    except Exception as e:
+        return redirect(url_for("tasks", error=f"Sync failed: {e}"))
 
 
 @app.route("/tasks/new", methods=["POST"])
