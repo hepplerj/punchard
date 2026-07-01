@@ -333,6 +333,70 @@ def tasks_sync():
         return redirect(url_for("tasks", error=str(e)))
 
 
+@app.route("/tasks/new", methods=["POST"])
+def new_task():
+    db = get_db()
+    pid = request.form.get("project_id") or None
+    db.execute(
+        "INSERT INTO tasks (source, project_id, title, status, assigned_to_me) "
+        "VALUES ('adhoc', ?, ?, 'open', 0)",
+        (pid, request.form["title"].strip()),
+    )
+    db.commit()
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/assign", methods=["POST"])
+def assign_task(task_id):
+    db = get_db()
+    pid = request.form.get("project_id") or None
+    db.execute("UPDATE tasks SET project_id = ? WHERE id = ?", (pid, task_id))
+    if pid:
+        row = db.execute("SELECT gh_repo FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row and row["gh_repo"]:
+            db.execute(
+                "INSERT INTO repo_project_map (repo, project_id) VALUES (?, ?) "
+                "ON CONFLICT(repo) DO UPDATE SET project_id = excluded.project_id",
+                (row["gh_repo"], pid),
+            )
+    db.commit()
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/done", methods=["POST"])
+def toggle_task_done(task_id):
+    db = get_db()
+    row = db.execute(
+        "SELECT status FROM tasks WHERE id = ? AND source = 'adhoc'", (task_id,)
+    ).fetchone()
+    if row:
+        if row["status"] == "open":
+            db.execute("UPDATE tasks SET status='done', done_at=? WHERE id=?", (ts_now(), task_id))
+        else:
+            db.execute("UPDATE tasks SET status='open', done_at=NULL WHERE id=?", (task_id,))
+        db.commit()
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/start", methods=["POST"])
+def start_task(task_id):
+    db = get_db()
+    task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task or not task["project_id"]:
+        return redirect(request.referrer or url_for("tasks"))
+    db.execute("UPDATE entries SET stopped_at = ? WHERE stopped_at IS NULL", (ts_now(),))
+    note = task["title"]
+    if task["gh_repo"]:
+        note = f"{task['title']} ({task['gh_repo']}#{task['gh_number']})"
+    db.execute(
+        "INSERT INTO entries (project_id, started_at, note, is_meeting, task_id) "
+        "VALUES (?, ?, ?, 0, ?)",
+        (task["project_id"], ts_now(), note, task_id),
+    )
+    db.commit()
+    return redirect(url_for("index"))
+
+
 # ---------------------------------------------------------------------------
 # Routes — projects
 # ---------------------------------------------------------------------------
