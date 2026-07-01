@@ -25,9 +25,14 @@ Single-file Flask app (`app.py`) with server-side Jinja2 rendering. No API endpo
 - Projects use soft-delete via `active` flag (archive/restore)
 - Entries have an `is_meeting` boolean flag — meetings are always tied to a project, not a separate category
 - Deleting a project cascades to delete its entries (manual SQL, not FK cascade)
+- Tasks (`tasks` table) are a planning inbox: GitHub issues/PRs (synced read-only from the `chnm` org via `github_sync.py`) plus ad hoc items. A task can be assigned to a project; `repo_project_map` remembers repo→project choices. Starting a timer from a task creates an entry linked via `entries.task_id`. Closing on GitHub → task marked done on next sync.
 
 **CSS:** Custom CSS with design variables in `static/style.css`. Warm cream/manila palette with monospace fonts (`--mono` variable) for data-heavy elements (times, hours, labels, buttons). No CSS framework.
 
 ## Import Scripts
 
 `scripts/import_clockify.py` and `scripts/import_timewarrior.py` auto-create projects and skip duplicates (keyed on `project_id + started_at`). Timewarrior timestamps are UTC and get converted to local time. The last tag becomes the project name, preceding tags become the note.
+
+## Environment Configuration
+
+The app auto-loads `.env` (gitignored) via `python-dotenv`. GitHub task sync requires `GITHUB_TOKEN` (personal access token) and `GITHUB_ORG` (organization name, defaults to `chnm`).
