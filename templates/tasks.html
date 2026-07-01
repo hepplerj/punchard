@@ -4,36 +4,46 @@
 
 {% block content %}
 
-<div class="section-header">
+<div class="section-header" x-data="{ addOpen: false }">
   <h2>Tasks</h2>
   <div style="display:flex;gap:.5rem;align-items:center">
     {% if last_sync %}<span class="muted">Last synced {{ last_sync }}</span>{% endif %}
+    <button class="btn btn-ghost btn-sm" title="New task"
+            @click="addOpen = true; $nextTick(() => $refs.title.focus())">+ New task</button>
     <a href="/tasks/browse" class="btn btn-ghost btn-sm">Browse org</a>
     <form action="/tasks/sync" method="post" class="inline-form">
       <button type="submit" class="btn btn-primary btn-sm">Sync from GitHub</button>
     </form>
   </div>
+
+  {# ── New-task modal ── #}
+  <div class="modal-backdrop" x-show="addOpen" x-cloak
+       @click="addOpen = false" @keydown.escape.window="addOpen = false">
+    <div class="modal" @click.stop>
+      <div class="modal-header">
+        <h3>New task</h3>
+        <button type="button" class="btn btn-ghost btn-sm" title="Close" @click="addOpen = false">✕</button>
+      </div>
+      <form action="/tasks/new" method="post">
+        <div class="form-group" style="margin-bottom:.9rem">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="Ad hoc task…" required x-ref="title">
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem">
+          <label>Project</label>
+          {{ project_select(projects, required=False, include_all=True, blank_label="— none —") }}
+        </div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost btn-sm" @click="addOpen = false">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Add task</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {% if error %}<div class="card" style="border-color:#EF4444"><p class="muted">⚠ {{ error }}</p></div>{% endif %}
 {% if synced %}<div class="card"><p class="muted">✓ {{ synced }}</p></div>{% endif %}
-
-{# ── Add ad hoc task ── #}
-<div class="card">
-  <form action="/tasks/new" method="post" class="form-row">
-    <div class="form-group" style="flex:2">
-      <label>New task</label>
-      <input type="text" name="title" placeholder="Ad hoc task…" required>
-    </div>
-    <div class="form-group" style="flex:2">
-      <label>Project</label>
-      {{ project_select(projects, required=False, include_all=True, blank_label="— none —") }}
-    </div>
-    <div class="form-group" style="justify-content:flex-end">
-      <button type="submit" class="btn btn-primary btn-sm">Add</button>
-    </div>
-  </form>
-</div>
 
 {# ── Filters ── #}
 <div class="card">

@@ -88,6 +88,37 @@ main {
 
 .section-header:first-child { margin-top: 0; }
 
+/* ── Modal (new-task popup) ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(44, 36, 22, .45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 1rem 1rem;
+}
+.modal {
+  width: 100%;
+  max-width: 30rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(44, 36, 22, .28);
+  padding: 1.25rem 1.5rem 1.5rem;
+  text-align: left;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.modal-header h3 { margin: 0; font-size: 1.05rem; }
+.modal .form-group label { display: block; margin-bottom: .3rem; }
+.modal input[type="text"], .modal select { width: 100%; }
+
 .section-header h2 {
   font-family: var(--mono);
   font-size: .85rem;
