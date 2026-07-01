@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 timer.db
 *.csv
+.env
