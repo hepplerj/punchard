@@ -20,6 +20,30 @@ def test_hide_done_filters(client, raw_db):
     assert b"Done one" in client.get("/tasks?hide_done=").data   # show all
 
 
+def test_pi_filter(client, raw_db, seed_project):
+    pa = seed_project(name="Alpha", pi_name="Dr. A")
+    pb = seed_project(name="Beta", pi_name="Dr. B")
+    raw_db.execute("INSERT INTO tasks (source, project_id, title, status) VALUES ('adhoc', ?, 'TaskA', 'open')", (pa,))
+    raw_db.execute("INSERT INTO tasks (source, project_id, title, status) VALUES ('adhoc', ?, 'TaskB', 'open')", (pb,))
+    raw_db.commit()
+    body = client.get("/tasks?pi_name=Dr.+A").data
+    assert b"TaskA" in body and b"TaskB" not in body
+
+
+def test_pi_and_project_combine(client, raw_db, seed_project):
+    pa = seed_project(name="Alpha", pi_name="Dr. A")
+    pb = seed_project(name="Beta", pi_name="Dr. B")
+    raw_db.execute("INSERT INTO tasks (source, project_id, title, status) VALUES ('adhoc', ?, 'TaskA', 'open')", (pa,))
+    raw_db.execute("INSERT INTO tasks (source, project_id, title, status) VALUES ('adhoc', ?, 'TaskB', 'open')", (pb,))
+    raw_db.commit()
+    # PI A combined with project Beta (which belongs to Dr. B) → no matches
+    both = client.get(f"/tasks?pi_name=Dr.+A&project_id={pb}").data
+    assert b"TaskA" not in both and b"TaskB" not in both
+    # PI A combined with its own project Alpha → TaskA only
+    match = client.get(f"/tasks?pi_name=Dr.+A&project_id={pa}").data
+    assert b"TaskA" in match and b"TaskB" not in match
+
+
 def test_sync_without_token_shows_error(client, monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     resp = client.post("/tasks/sync", follow_redirects=True)

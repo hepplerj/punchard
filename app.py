@@ -277,6 +277,7 @@ def tasks():
     ).fetchall()
 
     project_id = request.args.get("project_id", "")
+    pi_name = request.args.get("pi_name", "")
     hd = request.args.getlist("hide_done")
     hide_done = hd[-1] if hd else "1"
 
@@ -285,6 +286,9 @@ def tasks():
     if project_id:
         where.append("t.project_id = ?")
         params.append(project_id)
+    if pi_name:
+        where.append("p.pi_name = ?")
+        params.append(pi_name)
     if hide_done:
         where.append("t.status = 'open'")
     clause = ("WHERE " + " AND ".join(where)) if where else ""
@@ -301,11 +305,17 @@ def tasks():
         "SELECT value FROM meta WHERE key = 'github_last_sync'"
     ).fetchone()
 
+    pi_names = [r[0] for r in db.execute(
+        "SELECT DISTINCT pi_name FROM projects WHERE pi_name != '' ORDER BY pi_name"
+    ).fetchall()]
+
     return render_template(
         "tasks.html",
         tasks=rows,
         projects=projects,
+        pi_names=pi_names,
         project_id=project_id,
+        pi_name=pi_name,
         hide_done=hide_done,
         last_sync=last_sync["value"] if last_sync else None,
         synced=request.args.get("synced"),
