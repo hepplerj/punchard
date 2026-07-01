@@ -76,7 +76,7 @@
 
       {# Row 1: title (full width) #}
       <div class="task-title">
-        {% if t.project_color %}<span class="project-dot" style="background:{{ t.project_color }}"></span>{% endif %}
+        <span class="project-dot" style="background:{{ t.project_color or 'transparent' }}"></span>
         {% if t.source == 'github' %}
           <a href="{{ t.gh_url }}" target="_blank">{{ t.title }}</a>
         {% else %}
@@ -96,8 +96,8 @@
 
         <span class="task-spacer"></span>
 
-        {# assign / reassign project #}
-        <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form">
+        {# assign / reassign project — submitted inline via fetch (see script below) #}
+        <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form assign-form">
           {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
           <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
         </form>
@@ -124,5 +124,41 @@
 {% else %}
 <p class="muted empty-state">No tasks. Sync from GitHub or add an ad hoc task above.</p>
 {% endif %}
+
+{# Inline assign: POST in the background so the page never reloads or scrolls,
+   letting you triage the list top-to-bottom. Progressive enhancement — with
+   JS disabled the form still POSTs and redirects normally. #}
+<script>
+document.addEventListener("submit", function (e) {
+  const form = e.target.closest("form.assign-form");
+  if (!form) return;
+  e.preventDefault();
+  const row = form.closest(".task-item");
+  fetch(form.action, {
+    method: "POST",
+    body: new FormData(form),
+    headers: { "X-Requested-With": "fetch" },
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (!data || !data.ok) throw new Error("assign failed");
+      const dot = row.querySelector(".project-dot");
+      if (dot) dot.style.background = data.color || "transparent";
+      const startBtn = row.querySelector('form[action$="/start"] button');
+      if (startBtn) startBtn.disabled = !data.project_id;
+      let saved = form.querySelector(".assign-saved");
+      if (!saved) {
+        saved = document.createElement("span");
+        saved.className = "assign-saved";
+        form.appendChild(saved);
+      }
+      saved.textContent = data.project_name ? "✓ " + data.project_name : "✓ unassigned";
+      saved.classList.remove("flash");
+      void saved.offsetWidth; // restart the fade animation
+      saved.classList.add("flash");
+    })
+    .catch(() => form.submit()); // fall back to a full submit on any error
+});
+</script>
 
 {% endblock %}

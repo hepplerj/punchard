@@ -352,6 +352,7 @@ def new_task():
 def assign_task(task_id):
     db = get_db()
     pid = request.form.get("project_id") or None
+    pid = int(pid) if pid else None
     db.execute("UPDATE tasks SET project_id = ? WHERE id = ?", (pid, task_id))
     if pid:
         row = db.execute("SELECT gh_repo FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -362,6 +363,18 @@ def assign_task(task_id):
                 (row["gh_repo"], pid),
             )
     db.commit()
+    # Inline (fetch) assign: return the new project so the row can update
+    # in place without a reload. Falls back to a normal redirect otherwise.
+    if request.headers.get("X-Requested-With") == "fetch":
+        proj = db.execute(
+            "SELECT name, color FROM projects WHERE id = ?", (pid,)
+        ).fetchone() if pid else None
+        return {
+            "ok": True,
+            "project_id": pid,
+            "project_name": proj["name"] if proj else None,
+            "color": proj["color"] if proj else None,
+        }
     return redirect(request.referrer or url_for("tasks"))
 
 

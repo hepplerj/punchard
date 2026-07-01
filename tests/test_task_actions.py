@@ -17,6 +17,21 @@ def test_assign_remembers_repo_mapping(client, seed_project, raw_db):
     assert raw_db.execute("SELECT project_id FROM tasks WHERE id=?", (tid,)).fetchone()["project_id"] == pid
 
 
+def test_assign_xhr_returns_project_json(client, seed_project, raw_db):
+    pid = seed_project(name="Digital History")
+    raw_db.execute("INSERT INTO tasks (source, title, status, gh_repo, gh_number, assigned_to_me) "
+                   "VALUES ('github', 'X', 'open', 'chnm/foo', 6, 1)")
+    raw_db.commit()
+    tid = raw_db.execute("SELECT id FROM tasks WHERE gh_number=6").fetchone()["id"]
+    resp = client.post(f"/tasks/{tid}/assign", data={"project_id": str(pid)},
+                       headers={"X-Requested-With": "fetch"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] and body["project_id"] == pid
+    assert body["project_name"] == "Digital History"
+    assert raw_db.execute("SELECT project_id FROM tasks WHERE id=?", (tid,)).fetchone()["project_id"] == pid
+
+
 def test_toggle_done(client, raw_db):
     raw_db.execute("INSERT INTO tasks (source, title, status) VALUES ('adhoc', 'T', 'open')")
     raw_db.commit()

@@ -790,6 +790,19 @@ input[type="number"]:focus {
 .task-item.muted .task-title a,
 .task-item.muted .task-title span { color: var(--muted); }
 
+/* "✓ saved" confirmation after an inline assign */
+.assign-saved {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: #15803D;
+  white-space: nowrap;
+}
+.assign-saved.flash { animation: assign-fade 1.6s ease-out; }
+@keyframes assign-fade {
+  0%, 20% { opacity: 1; }
+  100% { opacity: .55; }
+}
+
 /* ── Utilities ── */
 .muted { color: var(--muted); }
 .empty-state { padding: 2rem 0; text-align: center; }
