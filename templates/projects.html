@@ -37,10 +37,16 @@
   </form>
 </div>
 
-{# ── Project list ── #}
+{# ── Project list (grouped by PI, alphabetical) ── #}
 {% if projects %}
 <div class="project-list">
+  {% set ns = namespace(current_pi=None) %}
   {% for p in projects %}
+  {% set pi = p.pi_name or "No PI" %}
+  {% if pi != ns.current_pi %}
+    {% set ns.current_pi = pi %}
+    <div class="pi-group-header">{{ pi }}</div>
+  {% endif %}
   <div class="project-row {% if not p.active %}project-inactive{% endif %}" x-data="{ editing: false }">
 
     <div class="project-info" x-show="!editing">

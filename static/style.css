@@ -321,6 +321,19 @@ input[type="time"]:focus {
   gap: .75rem;
 }
 
+.pi-group-header {
+  font-family: var(--mono);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: .75rem 0 -.15rem;
+  padding-bottom: .3rem;
+  border-bottom: 1px solid var(--border);
+}
+.pi-group-header:first-child { margin-top: 0; }
+
 .project-row {
   background: var(--surface);
   border: 1px solid var(--border);

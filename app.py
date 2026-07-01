@@ -297,7 +297,7 @@ def tasks():
         SELECT t.*, p.name AS project_name, p.color AS project_color
         FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
         {clause}
-        ORDER BY (t.project_id IS NULL), p.pi_name, p.name,
+        ORDER BY (t.source != 'adhoc'), (t.project_id IS NULL), p.pi_name, p.name,
                  t.status, t.gh_type, t.gh_number, t.id
     """, params).fetchall()
 
@@ -480,7 +480,7 @@ def projects():
         FROM projects p
         LEFT JOIN entries e ON p.id = e.project_id
         GROUP BY p.id
-        ORDER BY p.name
+        ORDER BY (p.pi_name = '' OR p.pi_name IS NULL), p.pi_name, p.name
     """).fetchall()
     return render_template("projects.html", projects=rows, colors=COLORS)
 

@@ -83,7 +83,7 @@
 <div class="entries-log">
   {% set ns = namespace(current='__start__') %}
   {% for t in tasks %}
-    {% set group = t.project_name or "Unassigned" %}
+    {% set group = "Ad hoc tasks" if t.source == 'adhoc' else (t.project_name or "Unassigned") %}
     {% if group != ns.current %}
       {% if ns.current != '__start__' %}</div>{% endif %}
       {% set ns.current = group %}

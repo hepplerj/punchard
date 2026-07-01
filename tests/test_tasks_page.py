@@ -44,6 +44,17 @@ def test_pi_and_project_combine(client, raw_db, seed_project):
     assert b"TaskA" in match and b"TaskB" not in match
 
 
+def test_adhoc_grouped_at_top(client, raw_db):
+    raw_db.execute("INSERT INTO tasks (source, title, status, gh_repo, gh_number, gh_url, gh_type, assigned_to_me) "
+                   "VALUES ('github', 'GH task', 'open', 'chnm/foo', 8, 'u', 'issue', 1)")
+    raw_db.execute("INSERT INTO tasks (source, title, status) VALUES ('adhoc', 'My todo', 'open')")
+    raw_db.commit()
+    body = client.get("/tasks").data.decode()
+    assert "Ad hoc tasks" in body and "Unassigned" in body
+    # ad hoc group renders before the Unassigned (GitHub) group
+    assert body.index("Ad hoc tasks") < body.index("Unassigned")
+
+
 def test_sync_without_token_shows_error(client, monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     resp = client.post("/tasks/sync", follow_redirects=True)
