@@ -30,6 +30,26 @@ just import-timewarrior                 # Reads from timew export
 
 Both scripts auto-create projects and skip duplicates on reimport.
 
+## GitHub task sync
+
+The Tasks page pulls issues/PRs from a GitHub org. Configure a `.env` file
+in the project root (gitignored):
+
+```
+GITHUB_TOKEN=ghp_your_personal_access_token
+GITHUB_ORG=chnm
+```
+
+Create the token under your **personal** GitHub account (Settings → Developer
+settings → Personal access tokens). A classic token with the `repo` scope
+works; if the org enforces SSO, authorize the token for the org. The app only
+reads from GitHub — close issues/PRs in GitHub and the next sync marks the
+matching task done.
+
+Click **Sync from GitHub** on the Tasks page to pull issues assigned to you
+and PRs awaiting your review. **Browse org** shows a live list of all open
+org issues so you can catch anything that should have been assigned to you.
+
 ## Stack
 
 Flask, SQLite, Alpine.js, Observable Plot. No build step. Single `timer.db` file for all data.

@@ -88,6 +88,37 @@ main {
 
 .section-header:first-child { margin-top: 0; }
 
+/* ── Modal (new-task popup) ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(44, 36, 22, .45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 1rem 1rem;
+}
+.modal {
+  width: 100%;
+  max-width: 30rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(44, 36, 22, .28);
+  padding: 1.25rem 1.5rem 1.5rem;
+  text-align: left;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.modal-header h3 { margin: 0; font-size: 1.05rem; }
+.modal .form-group label { display: block; margin-bottom: .3rem; }
+.modal input[type="text"], .modal select { width: 100%; }
+
 .section-header h2 {
   font-family: var(--mono);
   font-size: .85rem;
@@ -748,6 +779,60 @@ input[type="number"]:focus {
 
 .delta-over { color: #D97706; font-weight: 600; }
 .delta-under { color: var(--primary); font-weight: 600; }
+
+/* ── Task inbox rows (two-line: title above, meta + controls below) ── */
+.task-item {
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.task-item:last-child { border-bottom: none; }
+.task-item:hover { background: #F5F0E8; }
+
+.task-title {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+}
+.task-title a { color: var(--text); text-decoration: none; }
+.task-title a:hover { color: var(--primary); text-decoration: underline; }
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .45rem;
+  padding-left: 1.25rem; /* align under title text, clearing the project dot */
+}
+.task-spacer { flex: 1; }
+
+.repo-tag {
+  font-family: var(--mono);
+  font-size: .72rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: .1rem .4rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.task-item.muted .task-title a,
+.task-item.muted .task-title span { color: var(--muted); }
+
+/* "✓ saved" confirmation after an inline assign */
+.assign-saved {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: #15803D;
+  white-space: nowrap;
+}
+.assign-saved.flash { animation: assign-fade 1.6s ease-out; }
+@keyframes assign-fade {
+  0%, 20% { opacity: 1; }
+  100% { opacity: .55; }
+}
 
 /* ── Utilities ── */
 .muted { color: var(--muted); }

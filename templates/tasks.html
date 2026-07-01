@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "macros.html" import project_select %}
+{% block title %}Tasks — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header" x-data="{ addOpen: false }">
+  <h2>Tasks</h2>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    {% if last_sync %}<span class="muted">Last synced {{ last_sync }}</span>{% endif %}
+    <button class="btn btn-ghost btn-sm" title="New task"
+            @click="addOpen = true; $nextTick(() => $refs.title.focus())">+ New task</button>
+    <a href="/tasks/browse" class="btn btn-ghost btn-sm">Browse org</a>
+    <form action="/tasks/sync" method="post" class="inline-form">
+      <button type="submit" class="btn btn-primary btn-sm">Sync from GitHub</button>
+    </form>
+  </div>
+
+  {# ── New-task modal ── #}
+  <div class="modal-backdrop" x-show="addOpen" x-cloak
+       @click="addOpen = false" @keydown.escape.window="addOpen = false">
+    <div class="modal" @click.stop>
+      <div class="modal-header">
+        <h3>New task</h3>
+        <button type="button" class="btn btn-ghost btn-sm" title="Close" @click="addOpen = false">✕</button>
+      </div>
+      <form action="/tasks/new" method="post">
+        <div class="form-group" style="margin-bottom:.9rem">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="Ad hoc task…" required x-ref="title">
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem">
+          <label>Project</label>
+          {{ project_select(projects, required=False, include_all=True, blank_label="— none —") }}
+        </div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost btn-sm" @click="addOpen = false">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Add task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if error %}<div class="card" style="border-color:#EF4444"><p class="muted">⚠ {{ error }}</p></div>{% endif %}
+{% if synced %}<div class="card"><p class="muted">✓ {{ synced }}</p></div>{% endif %}
+
+{# ── Filters ── #}
+<div class="card">
+  <form method="get" action="/tasks" class="filter-form">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>PI</label>
+        <select name="pi_name">
+          <option value="">All PIs</option>
+          {% for pi in pi_names %}
+          <option value="{{ pi }}" {% if pi == pi_name %}selected{% endif %}>{{ pi }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Project</label>
+        {{ project_select(projects, selected=project_id, required=False, include_all=True) }}
+      </div>
+      <div class="form-group form-group-check">
+        <label class="check-label">
+          <input type="hidden" name="hide_done" value="">
+          <input type="checkbox" name="hide_done" value="1" {% if hide_done %}checked{% endif %}>
+          <span>Hide done</span>
+        </label>
+      </div>
+      <div class="form-group" style="justify-content:flex-end">
+        <div style="display:flex;gap:.5rem">
+          <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+          <a href="/tasks" class="btn btn-ghost btn-sm">Reset</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if tasks %}
+<div class="entries-log">
+  {% set ns = namespace(current='__start__') %}
+  {% for t in tasks %}
+    {% set group = t.project_name or "Unassigned" %}
+    {% if group != ns.current %}
+      {% if ns.current != '__start__' %}</div>{% endif %}
+      {% set ns.current = group %}
+      <div class="entries-day-group">
+      <div class="entries-day-header"><span>{{ group }}</span></div>
+    {% endif %}
+
+    <div class="task-item {% if t.status == 'done' %}muted{% endif %}">
+
+      {# Row 1: title (full width) #}
+      <div class="task-title">
+        <span class="project-dot" style="background:{{ t.project_color or 'transparent' }}"></span>
+        {% if t.source == 'github' %}
+          <a href="{{ t.gh_url }}" target="_blank">{{ t.title }}</a>
+        {% else %}
+          <span>{{ t.title }}</span>
+        {% endif %}
+      </div>
+
+      {# Row 2: meta + controls #}
+      <div class="task-meta">
+        {% if t.source == 'github' %}
+          <code class="repo-tag">{{ t.gh_repo.split('/')[-1] }}</code>
+          <span class="meeting-badge">{{ t.gh_type }} #{{ t.gh_number }}</span>
+          {% if t.gh_reason %}<span class="muted">{{ t.gh_reason }}</span>{% endif %}
+        {% else %}
+          <span class="meeting-badge">ad hoc</span>
+        {% endif %}
+
+        <span class="task-spacer"></span>
+
+        {# assign / reassign project — submitted inline via fetch (see script below) #}
+        <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form assign-form">
+          {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
+          <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
+        </form>
+
+        {# start timer (needs a project) #}
+        <form action="/tasks/{{ t.id }}/start" method="post" class="inline-form">
+          <button type="submit" class="btn btn-ghost btn-sm"
+                  {% if not t.project_id or t.status == 'done' %}disabled{% endif %}
+                  title="Start timer">▸</button>
+        </form>
+
+        {% if t.source == 'adhoc' %}
+        <form action="/tasks/{{ t.id }}/done" method="post" class="inline-form">
+          <button type="submit" class="btn btn-ghost btn-sm" title="Toggle done">
+            {% if t.status == 'done' %}↺{% else %}✓{% endif %}
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="muted empty-state">No tasks. Sync from GitHub or add an ad hoc task above.</p>
+{% endif %}
+
+{# Inline assign: POST in the background so the page never reloads or scrolls,
+   letting you triage the list top-to-bottom. Progressive enhancement — with
+   JS disabled the form still POSTs and redirects normally. #}
+<script>
+document.addEventListener("submit", function (e) {
+  const form = e.target.closest("form.assign-form");
+  if (!form) return;
+  e.preventDefault();
+  const row = form.closest(".task-item");
+  fetch(form.action, {
+    method: "POST",
+    body: new FormData(form),
+    headers: { "X-Requested-With": "fetch" },
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (!data || !data.ok) throw new Error("assign failed");
+      const dot = row.querySelector(".project-dot");
+      if (dot) dot.style.background = data.color || "transparent";
+      const startBtn = row.querySelector('form[action$="/start"] button');
+      if (startBtn) startBtn.disabled = !data.project_id;
+      let saved = form.querySelector(".assign-saved");
+      if (!saved) {
+        saved = document.createElement("span");
+        saved.className = "assign-saved";
+        form.appendChild(saved);
+      }
+      saved.textContent = data.project_name ? "✓ " + data.project_name : "✓ unassigned";
+      saved.classList.remove("flash");
+      void saved.offsetWidth; // restart the fade animation
+      saved.classList.add("flash");
+    })
+    .catch(() => form.submit()); // fall back to a full submit on any error
+});
+</script>
+
+{% endblock %}

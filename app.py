@@ -1,12 +1,18 @@
 import json
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, g, redirect, render_template, request, url_for
 
+import github_sync
+
+load_dotenv()
+
 app = Flask(__name__)
-DATABASE = Path(__file__).parent / "timer.db"
+DATABASE = Path(os.environ.get("TIMER_DB") or (Path(__file__).parent / "timer.db"))
 
 COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#06B6D4", "#F97316", "#EC4899"]
 
@@ -63,11 +69,40 @@ def init_db():
                 pi_name       TEXT NOT NULL,
                 percentage    REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                source         TEXT NOT NULL,
+                project_id     INTEGER REFERENCES projects(id),
+                title          TEXT NOT NULL,
+                status         TEXT NOT NULL DEFAULT 'open',
+                gh_repo        TEXT,
+                gh_number      INTEGER,
+                gh_url         TEXT,
+                gh_type        TEXT,
+                gh_reason      TEXT,
+                assigned_to_me INTEGER NOT NULL DEFAULT 0,
+                created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+                done_at        TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_tasks_gh ON tasks(gh_repo, gh_number);
+            CREATE TABLE IF NOT EXISTS repo_project_map (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                repo       TEXT NOT NULL UNIQUE,
+                project_id INTEGER NOT NULL REFERENCES projects(id)
+            );
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
         """)
         # Migration: add is_meeting to existing databases
         cols = [r[1] for r in db.execute("PRAGMA table_info(entries)").fetchall()]
         if "is_meeting" not in cols:
             db.execute("ALTER TABLE entries ADD COLUMN is_meeting INTEGER NOT NULL DEFAULT 0")
+        # Migration: add task_id to entries
+        ecols = [r[1] for r in db.execute("PRAGMA table_info(entries)").fetchall()]
+        if "task_id" not in ecols:
+            db.execute("ALTER TABLE entries ADD COLUMN task_id INTEGER REFERENCES tasks(id)")
 
 
 init_db()
@@ -228,6 +263,203 @@ def entries():
     return render_template("entries.html", entries=rows, projects=projects,
                            project_id=project_id, meeting_only=meeting_only,
                            start=start, end=end)
+
+
+# ---------------------------------------------------------------------------
+# Routes — tasks
+# ---------------------------------------------------------------------------
+
+@app.route("/tasks")
+def tasks():
+    db = get_db()
+    projects = db.execute(
+        "SELECT * FROM projects WHERE active = 1 ORDER BY pi_name, name"
+    ).fetchall()
+
+    project_id = request.args.get("project_id", "")
+    pi_name = request.args.get("pi_name", "")
+    hd = request.args.getlist("hide_done")
+    hide_done = hd[-1] if hd else "1"
+
+    where = []
+    params = []
+    if project_id:
+        where.append("t.project_id = ?")
+        params.append(project_id)
+    if pi_name:
+        where.append("p.pi_name = ?")
+        params.append(pi_name)
+    if hide_done:
+        where.append("t.status = 'open'")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+    rows = db.execute(f"""
+        SELECT t.*, p.name AS project_name, p.color AS project_color
+        FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
+        {clause}
+        ORDER BY (t.project_id IS NULL), p.pi_name, p.name,
+                 t.status, t.gh_type, t.gh_number, t.id
+    """, params).fetchall()
+
+    last_sync = db.execute(
+        "SELECT value FROM meta WHERE key = 'github_last_sync'"
+    ).fetchone()
+
+    pi_names = [r[0] for r in db.execute(
+        "SELECT DISTINCT pi_name FROM projects WHERE pi_name != '' ORDER BY pi_name"
+    ).fetchall()]
+
+    return render_template(
+        "tasks.html",
+        tasks=rows,
+        projects=projects,
+        pi_names=pi_names,
+        project_id=project_id,
+        pi_name=pi_name,
+        hide_done=hide_done,
+        last_sync=last_sync["value"] if last_sync else None,
+        synced=request.args.get("synced"),
+        error=request.args.get("error"),
+    )
+
+
+@app.route("/tasks/sync", methods=["POST"])
+def tasks_sync():
+    db = get_db()
+    try:
+        token, org = github_sync.env_config()
+        items = github_sync.fetch_mine(token, org)
+        summary = github_sync.reconcile(db, items)
+        db.execute(
+            "INSERT INTO meta (key, value) VALUES ('github_last_sync', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (ts_now(),),
+        )
+        db.commit()
+        msg = (f"Synced: {summary['added']} new, "
+               f"{summary['updated']} updated, {summary['closed']} closed.")
+        return redirect(url_for("tasks", synced=msg))
+    except github_sync.GitHubError as e:
+        return redirect(url_for("tasks", error=str(e)))
+    except Exception as e:
+        return redirect(url_for("tasks", error=f"Sync failed: {e}"))
+
+
+@app.route("/tasks/new", methods=["POST"])
+def new_task():
+    db = get_db()
+    pid = request.form.get("project_id") or None
+    db.execute(
+        "INSERT INTO tasks (source, project_id, title, status, assigned_to_me) "
+        "VALUES ('adhoc', ?, ?, 'open', 0)",
+        (pid, request.form["title"].strip()),
+    )
+    db.commit()
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/assign", methods=["POST"])
+def assign_task(task_id):
+    db = get_db()
+    pid = request.form.get("project_id") or None
+    pid = int(pid) if pid else None
+    db.execute("UPDATE tasks SET project_id = ? WHERE id = ?", (pid, task_id))
+    if pid:
+        row = db.execute("SELECT gh_repo FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row and row["gh_repo"]:
+            db.execute(
+                "INSERT INTO repo_project_map (repo, project_id) VALUES (?, ?) "
+                "ON CONFLICT(repo) DO UPDATE SET project_id = excluded.project_id",
+                (row["gh_repo"], pid),
+            )
+    db.commit()
+    # Inline (fetch) assign: return the new project so the row can update
+    # in place without a reload. Falls back to a normal redirect otherwise.
+    if request.headers.get("X-Requested-With") == "fetch":
+        proj = db.execute(
+            "SELECT name, color FROM projects WHERE id = ?", (pid,)
+        ).fetchone() if pid else None
+        return {
+            "ok": True,
+            "project_id": pid,
+            "project_name": proj["name"] if proj else None,
+            "color": proj["color"] if proj else None,
+        }
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/done", methods=["POST"])
+def toggle_task_done(task_id):
+    db = get_db()
+    row = db.execute(
+        "SELECT status FROM tasks WHERE id = ? AND source = 'adhoc'", (task_id,)
+    ).fetchone()
+    if row:
+        if row["status"] == "open":
+            db.execute("UPDATE tasks SET status='done', done_at=? WHERE id=?", (ts_now(), task_id))
+        else:
+            db.execute("UPDATE tasks SET status='open', done_at=NULL WHERE id=?", (task_id,))
+        db.commit()
+    return redirect(request.referrer or url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/start", methods=["POST"])
+def start_task(task_id):
+    db = get_db()
+    task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task or not task["project_id"]:
+        return redirect(request.referrer or url_for("tasks"))
+    db.execute("UPDATE entries SET stopped_at = ? WHERE stopped_at IS NULL", (ts_now(),))
+    note = task["title"]
+    if task["gh_repo"]:
+        note = f"{task['title']} ({task['gh_repo']}#{task['gh_number']})"
+    db.execute(
+        "INSERT INTO entries (project_id, started_at, note, is_meeting, task_id) "
+        "VALUES (?, ?, ?, 0, ?)",
+        (task["project_id"], ts_now(), note, task_id),
+    )
+    db.commit()
+    return redirect(url_for("index"))
+
+
+@app.route("/tasks/browse")
+def tasks_browse():
+    try:
+        token, org = github_sync.env_config()
+        items = github_sync.fetch_all_open(token, org)
+    except github_sync.GitHubError as e:
+        return render_template("tasks_browse.html", items=[], error=str(e))
+
+    db = get_db()
+    tracked = {
+        (r["gh_repo"], r["gh_number"])
+        for r in db.execute(
+            "SELECT gh_repo, gh_number FROM tasks WHERE source = 'github'"
+        ).fetchall()
+    }
+    for it in items:
+        it["tracked"] = (it["gh_repo"], it["gh_number"]) in tracked
+    return render_template("tasks_browse.html", items=items, error=None)
+
+
+@app.route("/tasks/browse/add", methods=["POST"])
+def browse_add():
+    db = get_db()
+    repo = request.form["gh_repo"]
+    mapped = db.execute(
+        "SELECT project_id FROM repo_project_map WHERE repo = ?", (repo,)
+    ).fetchone()
+    db.execute(
+        "INSERT INTO tasks (source, project_id, title, status, gh_repo, "
+        "gh_number, gh_url, gh_type, assigned_to_me) "
+        "VALUES ('github', ?, ?, 'open', ?, ?, ?, ?, 0) "
+        "ON CONFLICT(gh_repo, gh_number) DO NOTHING",
+        (mapped["project_id"] if mapped else None, request.form["title"],
+         repo, request.form["gh_number"], request.form["gh_url"],
+         request.form["gh_type"]),
+    )
+    db.commit()
+    return redirect(request.referrer or url_for("tasks_browse"))
 
 
 # ---------------------------------------------------------------------------

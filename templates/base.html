@@ -15,6 +15,7 @@
       <a href="/" {% if request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a>
       <a href="/projects" {% if request.endpoint == 'projects' %}class="active"{% endif %}>Projects</a>
       <a href="/entries" {% if request.endpoint == 'entries' %}class="active"{% endif %}>Entries</a>
+      <a href="/tasks" {% if request.endpoint in ('tasks', 'tasks_browse') %}class="active"{% endif %}>Tasks</a>
       <a href="/calendar" {% if request.endpoint == 'calendar' %}class="active"{% endif %}>Calendar</a>
       <a href="/report" {% if request.endpoint == 'report' %}class="active"{% endif %}>Report</a>
       <a href="/allocations" {% if request.endpoint == 'allocations' %}class="active"{% endif %}>Allocations</a>
