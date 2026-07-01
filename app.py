@@ -301,6 +301,30 @@ def tasks():
                  t.status, t.gh_type, t.gh_number, t.id
     """, params).fetchall()
 
+    # Per-heading counts — all statuses (so "[done / total]" reflects real
+    # progress even when done tasks are hidden), respecting project/PI filters.
+    count_where = []
+    count_params = []
+    if project_id:
+        count_where.append("t.project_id = ?")
+        count_params.append(project_id)
+    if pi_name:
+        count_where.append("p.pi_name = ?")
+        count_params.append(pi_name)
+    count_clause = ("WHERE " + " AND ".join(count_where)) if count_where else ""
+    group_counts = {
+        r["grp"]: {"total": r["total"], "done": r["done"]}
+        for r in db.execute(f"""
+            SELECT CASE WHEN t.source = 'adhoc' THEN 'Ad hoc tasks'
+                        ELSE COALESCE(p.name, 'Unassigned') END AS grp,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done
+            FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
+            {count_clause}
+            GROUP BY grp
+        """, count_params).fetchall()
+    }
+
     last_sync = db.execute(
         "SELECT value FROM meta WHERE key = 'github_last_sync'"
     ).fetchone()
@@ -313,6 +337,7 @@ def tasks():
         "tasks.html",
         tasks=rows,
         projects=projects,
+        group_counts=group_counts,
         pi_names=pi_names,
         project_id=project_id,
         pi_name=pi_name,

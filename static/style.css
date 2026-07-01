@@ -664,6 +664,9 @@ input[type="time"]:focus {
 }
 
 .entries-day-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   padding: .5rem 1rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
@@ -673,6 +676,13 @@ input[type="time"]:focus {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .06em;
+}
+
+.group-count {
+  font-weight: 600;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 /* ── Meeting badge ── */

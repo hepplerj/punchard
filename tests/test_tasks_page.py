@@ -55,6 +55,18 @@ def test_adhoc_grouped_at_top(client, raw_db):
     assert body.index("Ad hoc tasks") < body.index("Unassigned")
 
 
+def test_group_counts_show_done_over_total(client, raw_db):
+    raw_db.execute("INSERT INTO tasks (source, title, status) VALUES ('adhoc', 'Open one', 'open')")
+    raw_db.execute("INSERT INTO tasks (source, title, status, done_at) "
+                   "VALUES ('adhoc', 'Done one', 'done', '2026-01-01 00:00:00')")
+    raw_db.commit()
+    body = client.get("/tasks").data.decode()  # hide_done on by default
+    assert "Ad hoc tasks" in body
+    assert "[ 1 / 2 ]" in body          # counts include the hidden done task
+    assert "Open one" in body
+    assert "Done one" not in body        # done task counted but not listed
+
+
 def test_sync_without_token_shows_error(client, monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     resp = client.post("/tasks/sync", follow_redirects=True)

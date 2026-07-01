@@ -88,7 +88,11 @@
       {% if ns.current != '__start__' %}</div>{% endif %}
       {% set ns.current = group %}
       <div class="entries-day-group">
-      <div class="entries-day-header"><span>{{ group }}</span></div>
+      <div class="entries-day-header">
+        <span>{{ group }}</span>
+        {% set gc = group_counts.get(group) %}
+        {% if gc %}<span class="group-count">[ {{ gc.done }} / {{ gc.total }} ]</span>{% endif %}
+      </div>
     {% endif %}
 
     <div class="task-item {% if t.status == 'done' %}muted{% endif %}">
