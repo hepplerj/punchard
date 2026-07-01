@@ -67,11 +67,40 @@ def init_db():
                 pi_name       TEXT NOT NULL,
                 percentage    REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                source         TEXT NOT NULL,
+                project_id     INTEGER REFERENCES projects(id),
+                title          TEXT NOT NULL,
+                status         TEXT NOT NULL DEFAULT 'open',
+                gh_repo        TEXT,
+                gh_number      INTEGER,
+                gh_url         TEXT,
+                gh_type        TEXT,
+                gh_reason      TEXT,
+                assigned_to_me INTEGER NOT NULL DEFAULT 0,
+                created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+                done_at        TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_tasks_gh ON tasks(gh_repo, gh_number);
+            CREATE TABLE IF NOT EXISTS repo_project_map (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                repo       TEXT NOT NULL UNIQUE,
+                project_id INTEGER NOT NULL REFERENCES projects(id)
+            );
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
         """)
         # Migration: add is_meeting to existing databases
         cols = [r[1] for r in db.execute("PRAGMA table_info(entries)").fetchall()]
         if "is_meeting" not in cols:
             db.execute("ALTER TABLE entries ADD COLUMN is_meeting INTEGER NOT NULL DEFAULT 0")
+        # Migration: add task_id to entries
+        ecols = [r[1] for r in db.execute("PRAGMA table_info(entries)").fetchall()]
+        if "task_id" not in ecols:
+            db.execute("ALTER TABLE entries ADD COLUMN task_id INTEGER REFERENCES tasks(id)")
 
 
 init_db()
