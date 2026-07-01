@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "macros.html" import project_select %}
+{% block title %}Tasks — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header">
+  <h2>Tasks</h2>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    {% if last_sync %}<span class="muted">Last synced {{ last_sync }}</span>{% endif %}
+    <a href="/tasks/browse" class="btn btn-ghost btn-sm">Browse org</a>
+    <form action="/tasks/sync" method="post" class="inline-form">
+      <button type="submit" class="btn btn-primary btn-sm">Sync from GitHub</button>
+    </form>
+  </div>
+</div>
+
+{% if error %}<div class="card" style="border-color:#EF4444"><p class="muted">⚠ {{ error }}</p></div>{% endif %}
+{% if synced %}<div class="card"><p class="muted">✓ {{ synced }}</p></div>{% endif %}
+
+{# ── Add ad hoc task ── #}
+<div class="card">
+  <form action="/tasks/new" method="post" class="form-row">
+    <div class="form-group" style="flex:2">
+      <label>New task</label>
+      <input type="text" name="title" placeholder="Ad hoc task…" required>
+    </div>
+    <div class="form-group" style="flex:2">
+      <label>Project</label>
+      {{ project_select(projects, required=False, include_all=True) }}
+    </div>
+    <div class="form-group" style="justify-content:flex-end">
+      <button type="submit" class="btn btn-primary btn-sm">Add</button>
+    </div>
+  </form>
+</div>
+
+{# ── Filters ── #}
+<div class="card">
+  <form method="get" action="/tasks" class="filter-form">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Project</label>
+        {{ project_select(projects, selected=project_id, required=False, include_all=True) }}
+      </div>
+      <div class="form-group form-group-check">
+        <label class="check-label">
+          <input type="checkbox" name="hide_done" value="1" {% if hide_done %}checked{% endif %}>
+          <span>Hide done</span>
+        </label>
+      </div>
+      <div class="form-group" style="justify-content:flex-end">
+        <div style="display:flex;gap:.5rem">
+          <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+          <a href="/tasks" class="btn btn-ghost btn-sm">Reset</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if tasks %}
+<div class="entries-log">
+  {% set ns = namespace(current='__start__') %}
+  {% for t in tasks %}
+    {% set group = t.project_name or "Unassigned" %}
+    {% if group != ns.current %}
+      {% if ns.current != '__start__' %}</div>{% endif %}
+      {% set ns.current = group %}
+      <div class="entries-day-group">
+      <div class="entries-day-header"><span>{{ group }}</span></div>
+    {% endif %}
+
+    <div class="entry-row {% if t.status == 'done' %}muted{% endif %}">
+      {% if t.project_color %}<span class="project-dot" style="background:{{ t.project_color }}"></span>{% endif %}
+
+      {% if t.source == 'github' %}
+        <a href="{{ t.gh_url }}" target="_blank" class="entry-note">{{ t.title }}</a>
+        <span class="meeting-badge">{{ t.gh_type }} #{{ t.gh_number }}</span>
+        <span class="muted">{{ t.gh_reason }}</span>
+      {% else %}
+        <span class="entry-project">{{ t.title }}</span>
+        <span class="meeting-badge">ad hoc</span>
+      {% endif %}
+
+      <span style="flex:1"></span>
+
+      {# assign / reassign project #}
+      <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form">
+        {{ project_select(projects, selected=t.project_id, required=False, include_all=True) }}
+        <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
+      </form>
+
+      {# start timer (needs a project) #}
+      <form action="/tasks/{{ t.id }}/start" method="post" class="inline-form">
+        <button type="submit" class="btn btn-ghost btn-sm"
+                {% if not t.project_id or t.status == 'done' %}disabled{% endif %}
+                title="Start timer">▸</button>
+      </form>
+
+      {% if t.source == 'adhoc' %}
+      <form action="/tasks/{{ t.id }}/done" method="post" class="inline-form">
+        <button type="submit" class="btn btn-ghost btn-sm" title="Toggle done">
+          {% if t.status == 'done' %}↺{% else %}✓{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="muted empty-state">No tasks. Sync from GitHub or add an ad hoc task above.</p>
+{% endif %}
+
+{% endblock %}

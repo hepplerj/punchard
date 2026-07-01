@@ -7,6 +7,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, g, redirect, render_template, request, url_for
 
+import github_sync
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -261,6 +263,73 @@ def entries():
     return render_template("entries.html", entries=rows, projects=projects,
                            project_id=project_id, meeting_only=meeting_only,
                            start=start, end=end)
+
+
+# ---------------------------------------------------------------------------
+# Routes — tasks
+# ---------------------------------------------------------------------------
+
+@app.route("/tasks")
+def tasks():
+    db = get_db()
+    projects = db.execute(
+        "SELECT * FROM projects WHERE active = 1 ORDER BY pi_name, name"
+    ).fetchall()
+
+    project_id = request.args.get("project_id", "")
+    hide_done = request.args.get("hide_done", "1")
+
+    where = []
+    params = []
+    if project_id:
+        where.append("t.project_id = ?")
+        params.append(project_id)
+    if hide_done:
+        where.append("t.status = 'open'")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+    rows = db.execute(f"""
+        SELECT t.*, p.name AS project_name, p.color AS project_color
+        FROM tasks t LEFT JOIN projects p ON t.project_id = p.id
+        {clause}
+        ORDER BY (t.project_id IS NULL), p.pi_name, p.name,
+                 t.status, t.gh_type, t.gh_number, t.id
+    """, params).fetchall()
+
+    last_sync = db.execute(
+        "SELECT value FROM meta WHERE key = 'github_last_sync'"
+    ).fetchone()
+
+    return render_template(
+        "tasks.html",
+        tasks=rows,
+        projects=projects,
+        project_id=project_id,
+        hide_done=hide_done,
+        last_sync=last_sync["value"] if last_sync else None,
+        synced=request.args.get("synced"),
+        error=request.args.get("error"),
+    )
+
+
+@app.route("/tasks/sync", methods=["POST"])
+def tasks_sync():
+    db = get_db()
+    try:
+        token, org = github_sync.env_config()
+        items = github_sync.fetch_mine(token, org)
+        summary = github_sync.reconcile(db, items)
+        db.execute(
+            "INSERT INTO meta (key, value) VALUES ('github_last_sync', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (ts_now(),),
+        )
+        db.commit()
+        msg = (f"Synced: {summary['added']} new, "
+               f"{summary['updated']} updated, {summary['closed']} closed.")
+        return redirect(url_for("tasks", synced=msg))
+    except github_sync.GitHubError as e:
+        return redirect(url_for("tasks", error=str(e)))
 
 
 # ---------------------------------------------------------------------------
