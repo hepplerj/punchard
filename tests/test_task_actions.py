@@ -44,5 +44,16 @@ def test_start_timer_requires_project(client, raw_db):
     raw_db.execute("INSERT INTO tasks (source, title, status) VALUES ('adhoc', 'no project', 'open')")
     raw_db.commit()
     tid = raw_db.execute("SELECT id FROM tasks WHERE title='no project'").fetchone()["id"]
-    client.post(f"/tasks/{tid}/start")
+    resp = client.post(f"/tasks/{tid}/start")
+    assert resp.status_code == 302
     assert raw_db.execute("SELECT COUNT(*) c FROM entries").fetchone()["c"] == 0
+
+
+def test_toggle_done_ignores_github_task(client, raw_db):
+    raw_db.execute("INSERT INTO tasks (source, title, status, gh_repo, gh_number, assigned_to_me) "
+                   "VALUES ('github', 'GH task', 'open', 'chnm/foo', 11, 1)")
+    raw_db.commit()
+    tid = raw_db.execute("SELECT id FROM tasks WHERE gh_number=11").fetchone()["id"]
+    resp = client.post(f"/tasks/{tid}/done")
+    assert resp.status_code == 302
+    assert raw_db.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()["status"] == "open"
