@@ -94,3 +94,54 @@ def reconcile(db, items):
 
     db.commit()
     return {"added": added, "updated": updated, "closed": closed}
+
+
+def env_config():
+    token = os.environ.get("GITHUB_TOKEN")
+    org = os.environ.get("GITHUB_ORG", "chnm")
+    if not token:
+        raise GitHubError("GITHUB_TOKEN is not set — add it to your .env file.")
+    return token, org
+
+
+def _headers(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def _search(query, token):
+    try:
+        resp = requests.get(
+            API, headers=_headers(token),
+            params={"q": query, "per_page": 100}, timeout=15,
+        )
+    except requests.RequestException as e:
+        raise GitHubError(f"Could not reach GitHub: {e}")
+    if resp.status_code != 200:
+        raise GitHubError(f"GitHub API returned {resp.status_code}: {resp.text[:200]}")
+    return resp.json().get("items", [])
+
+
+def fetch_mine(token, org):
+    assigned = [parse_item(r, "assigned")
+                for r in _search(f"org:{org} is:open assignee:@me", token)]
+    review = [parse_item(r, "review")
+              for r in _search(f"org:{org} is:open review-requested:@me", token)]
+    return merge_items(assigned, review)
+
+
+def fetch_all_open(token, org):
+    items = []
+    for r in _search(f"org:{org} is:open sort:updated-desc", token):
+        items.append({
+            "gh_repo": r["repository_url"].split("/repos/", 1)[1],
+            "gh_number": r["number"],
+            "gh_url": r["html_url"],
+            "gh_type": "pr" if "pull_request" in r else "issue",
+            "title": r["title"],
+            "assignees": [a["login"] for a in r.get("assignees", [])],
+        })
+    return items
