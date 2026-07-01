@@ -72,40 +72,51 @@
       <div class="entries-day-header"><span>{{ group }}</span></div>
     {% endif %}
 
-    <div class="entry-row {% if t.status == 'done' %}muted{% endif %}">
-      {% if t.project_color %}<span class="project-dot" style="background:{{ t.project_color }}"></span>{% endif %}
+    <div class="task-item {% if t.status == 'done' %}muted{% endif %}">
 
-      {% if t.source == 'github' %}
-        <a href="{{ t.gh_url }}" target="_blank" class="entry-note">{{ t.title }}</a>
-        <span class="meeting-badge">{{ t.gh_type }} #{{ t.gh_number }}</span>
-        <span class="muted">{{ t.gh_reason }}</span>
-      {% else %}
-        <span class="entry-project">{{ t.title }}</span>
-        <span class="meeting-badge">ad hoc</span>
-      {% endif %}
+      {# Row 1: title (full width) #}
+      <div class="task-title">
+        {% if t.project_color %}<span class="project-dot" style="background:{{ t.project_color }}"></span>{% endif %}
+        {% if t.source == 'github' %}
+          <a href="{{ t.gh_url }}" target="_blank">{{ t.title }}</a>
+        {% else %}
+          <span>{{ t.title }}</span>
+        {% endif %}
+      </div>
 
-      <span style="flex:1"></span>
+      {# Row 2: meta + controls #}
+      <div class="task-meta">
+        {% if t.source == 'github' %}
+          <code class="repo-tag">{{ t.gh_repo.split('/')[-1] }}</code>
+          <span class="meeting-badge">{{ t.gh_type }} #{{ t.gh_number }}</span>
+          {% if t.gh_reason %}<span class="muted">{{ t.gh_reason }}</span>{% endif %}
+        {% else %}
+          <span class="meeting-badge">ad hoc</span>
+        {% endif %}
 
-      {# assign / reassign project #}
-      <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form">
-        {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
-        <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
-      </form>
+        <span class="task-spacer"></span>
 
-      {# start timer (needs a project) #}
-      <form action="/tasks/{{ t.id }}/start" method="post" class="inline-form">
-        <button type="submit" class="btn btn-ghost btn-sm"
-                {% if not t.project_id or t.status == 'done' %}disabled{% endif %}
-                title="Start timer">▸</button>
-      </form>
+        {# assign / reassign project #}
+        <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form">
+          {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
+          <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
+        </form>
 
-      {% if t.source == 'adhoc' %}
-      <form action="/tasks/{{ t.id }}/done" method="post" class="inline-form">
-        <button type="submit" class="btn btn-ghost btn-sm" title="Toggle done">
-          {% if t.status == 'done' %}↺{% else %}✓{% endif %}
-        </button>
-      </form>
-      {% endif %}
+        {# start timer (needs a project) #}
+        <form action="/tasks/{{ t.id }}/start" method="post" class="inline-form">
+          <button type="submit" class="btn btn-ghost btn-sm"
+                  {% if not t.project_id or t.status == 'done' %}disabled{% endif %}
+                  title="Start timer">▸</button>
+        </form>
+
+        {% if t.source == 'adhoc' %}
+        <form action="/tasks/{{ t.id }}/done" method="post" class="inline-form">
+          <button type="submit" class="btn btn-ghost btn-sm" title="Toggle done">
+            {% if t.status == 'done' %}↺{% else %}✓{% endif %}
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </div>
   {% endfor %}
   </div>

@@ -749,6 +749,47 @@ input[type="number"]:focus {
 .delta-over { color: #D97706; font-weight: 600; }
 .delta-under { color: var(--primary); font-weight: 600; }
 
+/* ── Task inbox rows (two-line: title above, meta + controls below) ── */
+.task-item {
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.task-item:last-child { border-bottom: none; }
+.task-item:hover { background: #F5F0E8; }
+
+.task-title {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+}
+.task-title a { color: var(--text); text-decoration: none; }
+.task-title a:hover { color: var(--primary); text-decoration: underline; }
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .45rem;
+  padding-left: 1.25rem; /* align under title text, clearing the project dot */
+}
+.task-spacer { flex: 1; }
+
+.repo-tag {
+  font-family: var(--mono);
+  font-size: .72rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: .1rem .4rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.task-item.muted .task-title a,
+.task-item.muted .task-title span { color: var(--muted); }
+
 /* ── Utilities ── */
 .muted { color: var(--muted); }
 .empty-state { padding: 2rem 0; text-align: center; }
