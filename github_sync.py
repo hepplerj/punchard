@@ -126,16 +126,19 @@ def _search(query, token):
 
 
 def fetch_mine(token, org):
+    # archived:false skips repos that have been archived on GitHub — an archived
+    # repo is a finished project, so its issues/PRs drop out of the sync (and
+    # reconcile then marks any previously-synced tasks from it done).
     assigned = [parse_item(r, "assigned")
-                for r in _search(f"org:{org} is:open assignee:@me", token)]
+                for r in _search(f"org:{org} is:open assignee:@me archived:false", token)]
     review = [parse_item(r, "review")
-              for r in _search(f"org:{org} is:open review-requested:@me", token)]
+              for r in _search(f"org:{org} is:open review-requested:@me archived:false", token)]
     return merge_items(assigned, review)
 
 
 def fetch_all_open(token, org):
     items = []
-    for r in _search(f"org:{org} is:open sort:updated-desc", token):
+    for r in _search(f"org:{org} is:open archived:false sort:updated-desc", token):
         items.append({
             "gh_repo": r["repository_url"].split("/repos/", 1)[1],
             "gh_number": r["number"],

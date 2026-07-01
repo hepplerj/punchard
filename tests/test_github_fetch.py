@@ -50,3 +50,17 @@ def test_fetch_raises_on_error(monkeypatch):
                         lambda *a, **k: FakeResp(401, {}))
     with pytest.raises(github_sync.GitHubError):
         github_sync.fetch_mine("tok", "chnm")
+
+
+def test_queries_exclude_archived_repos(monkeypatch):
+    seen = []
+
+    def fake_get(url, headers, params, timeout):
+        seen.append(params["q"])
+        return FakeResp(200, {"items": []})
+
+    monkeypatch.setattr(github_sync.requests, "get", fake_get)
+    github_sync.fetch_mine("tok", "chnm")
+    github_sync.fetch_all_open("tok", "chnm")
+    assert seen, "expected search queries to be issued"
+    assert all("archived:false" in q for q in seen)
