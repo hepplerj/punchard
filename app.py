@@ -1,12 +1,16 @@
 import json
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, g, redirect, render_template, request, url_for
 
+load_dotenv()
+
 app = Flask(__name__)
-DATABASE = Path(__file__).parent / "timer.db"
+DATABASE = Path(os.environ.get("TIMER_DB") or (Path(__file__).parent / "timer.db"))
 
 COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#06B6D4", "#F97316", "#EC4899"]
 

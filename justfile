@@ -32,3 +32,7 @@ import-timewarrior:
 # Show a summary of logged hours by project (all time)
 summary:
     uv run python scripts/summary.py
+
+# Run the test suite
+test:
+    uv run pytest
