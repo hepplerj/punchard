@@ -82,7 +82,7 @@ Nullable INTEGER, FK → tasks(id). Set when a timer is started from a task. The
 ## GitHub sync
 
 ### Config
-- `GITHUB_PAT` — a Personal Access Token with read access to org repos, read
+- `GITHUB_TOKEN` — a Personal Access Token with read access to org repos, read
   from the environment at sync time. Never committed.
 - `GITHUB_ORG` — defaults to `chnm`.
 - Both documented in the README; `.env` remains gitignored. Using `@me` in the
