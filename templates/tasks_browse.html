@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Browse org — Punchcard{% endblock %}
+
+{% block content %}
+
+<div class="section-header">
+  <h2>Browse org issues</h2>
+  <a href="/tasks" class="btn btn-ghost btn-sm">← Back to tasks</a>
+</div>
+
+{% if error %}
+<div class="card" style="border-color:#EF4444"><p class="muted">⚠ {{ error }}</p></div>
+{% else %}
+<div class="card"><p class="muted">
+  Live view of open issues/PRs in the org (up to 100, most recently updated).
+  Nothing here is saved until you add it.
+</p></div>
+
+{% if items %}
+<div class="entries-log">
+  <div class="entries-day-group">
+  {% for it in items %}
+    <div class="entry-row">
+      <a href="{{ it.gh_url }}" target="_blank" class="entry-note">{{ it.title }}</a>
+      <span class="meeting-badge">{{ it.gh_repo }} {{ it.gh_type }} #{{ it.gh_number }}</span>
+      {% if it.assignees %}<span class="muted">→ {{ it.assignees|join(", ") }}</span>{% endif %}
+      <span style="flex:1"></span>
+      {% if it.tracked %}
+        <span class="muted">already tracked</span>
+      {% else %}
+        <form action="/tasks/browse/add" method="post" class="inline-form">
+          <input type="hidden" name="gh_repo" value="{{ it.gh_repo }}">
+          <input type="hidden" name="gh_number" value="{{ it.gh_number }}">
+          <input type="hidden" name="gh_type" value="{{ it.gh_type }}">
+          <input type="hidden" name="gh_url" value="{{ it.gh_url }}">
+          <input type="hidden" name="title" value="{{ it.title }}">
+          <button type="submit" class="btn btn-ghost btn-sm">+ Add</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="muted empty-state">No open issues found in the org.</p>
+{% endif %}
+{% endif %}
+
+{% endblock %}

@@ -397,6 +397,46 @@ def start_task(task_id):
     return redirect(url_for("index"))
 
 
+@app.route("/tasks/browse")
+def tasks_browse():
+    try:
+        token, org = github_sync.env_config()
+        items = github_sync.fetch_all_open(token, org)
+    except github_sync.GitHubError as e:
+        return render_template("tasks_browse.html", items=[], error=str(e))
+
+    db = get_db()
+    tracked = {
+        (r["gh_repo"], r["gh_number"])
+        for r in db.execute(
+            "SELECT gh_repo, gh_number FROM tasks WHERE source = 'github'"
+        ).fetchall()
+    }
+    for it in items:
+        it["tracked"] = (it["gh_repo"], it["gh_number"]) in tracked
+    return render_template("tasks_browse.html", items=items, error=None)
+
+
+@app.route("/tasks/browse/add", methods=["POST"])
+def browse_add():
+    db = get_db()
+    repo = request.form["gh_repo"]
+    mapped = db.execute(
+        "SELECT project_id FROM repo_project_map WHERE repo = ?", (repo,)
+    ).fetchone()
+    db.execute(
+        "INSERT INTO tasks (source, project_id, title, status, gh_repo, "
+        "gh_number, gh_url, gh_type, assigned_to_me) "
+        "VALUES ('github', ?, ?, 'open', ?, ?, ?, ?, 0) "
+        "ON CONFLICT(gh_repo, gh_number) DO NOTHING",
+        (mapped["project_id"] if mapped else None, request.form["title"],
+         repo, request.form["gh_number"], request.form["gh_url"],
+         request.form["gh_type"]),
+    )
+    db.commit()
+    return redirect(request.referrer or url_for("tasks_browse"))
+
+
 # ---------------------------------------------------------------------------
 # Routes — projects
 # ---------------------------------------------------------------------------
