@@ -59,6 +59,7 @@
         <tr>
           <th>PI / Category</th>
           <th class="num">%</th>
+          <th class="num">Weekly <span class="muted">(40h)</span></th>
           <th></th>
         </tr>
       </thead>
@@ -67,6 +68,8 @@
         <tr>
           <td>{{ e.pi_name }}{% if e.pi_name == 'Professional Development' %} <span class="muted">(fixed)</span>{% endif %}</td>
           <td class="num">{{ "%.0f"|format(e.percentage) }}%</td>
+          {% set weekly_hours = e.percentage / 100 * 40 %}
+          <td class="num muted">{{ "%g"|format(weekly_hours) }} hrs · {{ "%.1f"|format(weekly_hours / 8) }} days</td>
           <td class="num">
             {% if e.pi_name != 'Professional Development' %}
             <form action="/allocations/entries/{{ e.id }}/delete" method="post" class="inline-form">
