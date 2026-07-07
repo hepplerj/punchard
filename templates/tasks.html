@@ -122,7 +122,7 @@
         {# assign / reassign project — submitted inline via fetch (see script below) #}
         <form action="/tasks/{{ t.id }}/assign" method="post" class="inline-form assign-form">
           {{ project_select(projects, selected=t.project_id, required=False, include_all=True, blank_label="— none —") }}
-          <button type="submit" class="btn btn-ghost btn-sm">Assign</button>
+          <button type="submit" class="btn btn-ghost btn-sm" title="Assign to project">→</button>
         </form>
 
         {# start timer (needs a project) #}

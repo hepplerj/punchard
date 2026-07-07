@@ -830,6 +830,11 @@ input[type="number"]:focus {
 }
 .task-spacer { flex: 1; }
 
+/* keep the assign select + the three action icons on one aligned line */
+.task-meta .inline-form { display: inline-flex; align-items: center; gap: .5rem; }
+.task-meta select { width: 12rem; }
+.task-meta .assign-saved { margin-left: .25rem; }
+
 .repo-tag {
   font-family: var(--mono);
   font-size: .72rem;
